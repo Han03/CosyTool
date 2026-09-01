@@ -1,0 +1,37 @@
+name: cosy_tool
+description: "CosyTool - 基于 Flutter 的跨平台轻量工具箱，包含录音、分贝测试、延迟拍照、秒表、番茄钟等常用工具，手机与桌面端自适应。"
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  # 录音 / 分贝测量
+  record: ^7.1.1
+  # 录音回放
+  audioplayers: ^6.8.1
+  # 应用文件目录
+  path_provider: ^2.1.6
+  # 延迟拍照（移动端）
+  camera: ^0.12.0+2
+  # 手电筒（移动端）
+  torch_light: ^2.0.0
+  # 二维码生成
+  qr_flutter: ^4.1.0
+  # 权限请求
+  permission_handler: ^13.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
