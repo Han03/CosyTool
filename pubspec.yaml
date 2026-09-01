@@ -24,8 +24,8 @@ dependencies:
   torch_light: ^2.0.0
   # 二维码生成
   qr_flutter: ^4.1.0
-  # 权限请求
-  permission_handler: ^13.0.1
+  # 权限请求（12.x：兼容 AGP 9.1 compileSdk 36；13.x 要求 android-37）
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
