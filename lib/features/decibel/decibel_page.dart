@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/utils/permissions.dart';
 import '../../data/tools_registry.dart';
@@ -13,7 +15,8 @@ import '../../shared/widgets/tool_page_scaffold.dart';
 /// 分贝测试工具：实时测量环境音量并绘制趋势曲线。
 ///
 /// 通过 `record` 的振幅流（dBFS）读取音量，并映射为参考分贝值。
-/// 注意：手机麦克风未做设备校准，数值为相对参考，不同设备存在差异。
+/// 注意：手机麦克风未做设备校准，数值为相对参考，不同设备存在差异；
+/// 支持通过「校准偏移」手动微调，校准值会持久化保存。
 class DecibelPage extends StatefulWidget {
   const DecibelPage({super.key});
 
@@ -24,14 +27,19 @@ class DecibelPage extends StatefulWidget {
 class _DecibelPageState extends State<DecibelPage> {
   static final ToolInfo _tool = ToolRegistry.of('decibel');
 
-  static const int _historySize = 120;
+  static const int _historySize = 180;
 
   final AudioRecorder _recorder = AudioRecorder();
   StreamSubscription<Amplitude>? _sub;
   String? _tempPath;
+  Timer? _ticker;
 
   bool _running = false;
   String? _error;
+
+  double _calibration = 0; // 校准偏移（dB），持久化
+  DateTime? _sessionStart;
+  Duration _sessionElapsed = Duration.zero;
 
   double _current = 0;
   double _min = 0;
@@ -41,8 +49,26 @@ class _DecibelPageState extends State<DecibelPage> {
   final List<double> _history = [];
 
   @override
+  void initState() {
+    super.initState();
+    _loadCalibration();
+  }
+
+  Future<void> _loadCalibration() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getDouble('decibel_calibration') ?? 0;
+    if (mounted) setState(() => _calibration = v);
+  }
+
+  Future<void> _saveCalibration(double v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('decibel_calibration', v);
+  }
+
+  @override
   void dispose() {
     _stop();
+    _ticker?.cancel();
     _recorder.dispose();
     super.dispose();
   }
@@ -78,6 +104,14 @@ class _DecibelPageState extends State<DecibelPage> {
       _sub = _recorder
           .onAmplitudeChanged(const Duration(milliseconds: 120))
           .listen(_onAmplitude);
+      _sessionStart = DateTime.now();
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) {
+          setState(() {
+            _sessionElapsed = DateTime.now().difference(_sessionStart!);
+          });
+        }
+      });
       if (!mounted) return;
       setState(() {
         _running = true;
@@ -87,6 +121,7 @@ class _DecibelPageState extends State<DecibelPage> {
         _sum = 0;
         _count = 0;
         _current = 0;
+        _sessionElapsed = Duration.zero;
         _history.clear();
       });
     } catch (e) {
@@ -115,6 +150,8 @@ class _DecibelPageState extends State<DecibelPage> {
   }
 
   Future<void> _stop() async {
+    _ticker?.cancel();
+    _ticker = null;
     await _sub?.cancel();
     _sub = null;
     try {
@@ -135,29 +172,72 @@ class _DecibelPageState extends State<DecibelPage> {
 
   double _toReferenceDb(double dbfs) {
     if (!dbfs.isFinite) dbfs = -60;
-    return (dbfs + 100).clamp(30.0, 115.0);
+    return (dbfs + 100 + _calibration).clamp(20.0, 120.0);
   }
 
   double get _avg => _count == 0 ? 0 : _sum / _count;
 
-  String get _status {
+  (String, Color) get _levelInfo {
     final d = _current;
-    if (d < 40) return '非常安静';
-    if (d < 50) return '安静';
-    if (d < 60) return '正常交谈';
-    if (d < 70) return '环境较吵';
-    if (d < 80) return '吵闹';
-    if (d < 90) return '很吵';
-    return '震耳欲聋';
+    if (d < 40) return ('非常安静', const Color(0xFF7A8AA0));
+    if (d < 50) return ('安静', const Color(0xFF3A9B6E));
+    if (d < 60) return ('正常交谈', const Color(0xFF2F9E6E));
+    if (d < 70) return ('环境较吵', const Color(0xFFF09B3A));
+    if (d < 80) return ('吵闹', const Color(0xFFE8663A));
+    if (d < 90) return ('很吵', const Color(0xFFE85D5D));
+    return ('震耳欲聋', const Color(0xFFB3253A));
+  }
+
+  String _fmtDur(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    final s = d.inSeconds % 60;
+    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _exportCsv() async {
+    if (_history.isEmpty) return;
+    final sb = StringBuffer('时间,分贝(dB)\n');
+    for (var i = 0; i < _history.length; i++) {
+      sb.writeln('${(i * 0.12).toStringAsFixed(2)},${_history[i].toStringAsFixed(1)}');
+    }
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final file = File(
+        '${docs.path}${Platform.pathSeparator}decibel_${DateTime.now().millisecondsSinceEpoch}.csv',
+      );
+      await file.writeAsString(sb.toString());
+      // 同时复制概要到剪贴板
+      final summary = '分贝测量概要\n时长: ${_fmtDur(_sessionElapsed)}\n'
+          '最低: ${_min.round()} dB\n平均: ${_avg.round()} dB\n峰值: ${_max.round()} dB\n';
+      await Clipboard.setData(ClipboardData(text: summary));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('CSV 已保存到：${file.path}\n概要已复制到剪贴板')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('导出失败：$e')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final (levelText, levelColor) = _levelInfo;
 
     return ToolPageScaffold(
       tool: _tool,
+      actions: [
+        if (_history.isNotEmpty)
+          IconButton(
+            tooltip: '导出 CSV',
+            icon: const Icon(Icons.download_rounded),
+            onPressed: _exportCsv,
+          ),
+      ],
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -177,7 +257,7 @@ class _DecibelPageState extends State<DecibelPage> {
                         style: theme.textTheme.displayLarge?.copyWith(
                           fontWeight: FontWeight.w200,
                           fontFeatures: const [FontFeature.tabularFigures()],
-                          color: _running ? colorScheme.primary : colorScheme.outline,
+                          color: _running ? levelColor : colorScheme.outline,
                         ),
                       ),
                       Padding(
@@ -187,21 +267,27 @@ class _DecibelPageState extends State<DecibelPage> {
                     ],
                   ),
                   Text(
-                    _running ? _status : '点击开始测量',
+                    _running ? levelText : '点击开始测量',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: _running ? colorScheme.onSurface : colorScheme.outline,
+                      color: _running ? levelColor : colorScheme.outline,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  if (_running)
+                    Text(
+                      '已测量 ${_fmtDur(_sessionElapsed)} · 采样 $_count 次',
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
                   const SizedBox(height: 24),
                   // 实时柱
                   SizedBox(
-                    height: 160,
+                    height: 150,
                     child: CustomPaint(
-                      size: const Size(double.infinity, 160),
+                      size: const Size(double.infinity, 150),
                       painter: _BarPainter(
-                        value: _running ? (_current - 30) / 85 : 0,
-                        color: colorScheme.primary,
+                        value: _running ? (_current - 20) / 100 : 0,
+                        color: levelColor,
                       ),
                     ),
                   ),
@@ -219,8 +305,8 @@ class _DecibelPageState extends State<DecibelPage> {
                       size: const Size(double.infinity, 120),
                       painter: _HistoryPainter(
                         values: _history,
-                        min: 30,
-                        max: 115,
+                        min: 20,
+                        max: 120,
                         lineColor: colorScheme.primary,
                         fillColor: colorScheme.primary.withValues(alpha: 0.12),
                       ),
@@ -238,6 +324,40 @@ class _DecibelPageState extends State<DecibelPage> {
                     ],
                   ),
                   const Spacer(),
+                  // 校准偏移
+                  Row(
+                    children: [
+                      const Icon(Icons.tune_rounded, size: 18),
+                      const SizedBox(width: 8),
+                      Text('校准偏移', style: theme.textTheme.bodyMedium),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Slider(
+                          value: _calibration,
+                          min: -20,
+                          max: 20,
+                          divisions: 40,
+                          label: '${_calibration.round()} dB',
+                          onChanged: (v) {
+                            setState(() => _calibration = v.roundToDouble());
+                          },
+                          onChangeEnd: (v) => _saveCalibration(v.roundToDouble()),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 48,
+                        child: Text(
+                          '${_calibration > 0 ? '+' : ''}${_calibration.round()} dB',
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton.icon(
                     onPressed: _toggle,
                     icon: Icon(_running ? Icons.stop_rounded : Icons.play_arrow_rounded),
@@ -249,7 +369,8 @@ class _DecibelPageState extends State<DecibelPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '参考值未经设备校准，不同设备存在差异',
+                    '参考值未经设备校准，不同设备存在差异；可用校准偏移微调',
+                    textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
                   ),
                   if (_error != null)

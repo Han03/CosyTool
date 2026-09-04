@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -38,11 +39,29 @@ class _RecorderPageState extends State<RecorderPage> {
 
   final List<_RecordingItem> _items = [];
   String? _playingPath;
+  Duration _playingDuration = Duration.zero;
+  Duration _playingPosition = Duration.zero;
+  bool _seekTicking = false;
 
   @override
   void initState() {
     super.initState();
     _init();
+    _player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _playingDuration = d);
+    });
+    _player.onPositionChanged.listen((d) {
+      if (!_seekTicking && mounted) setState(() => _playingPosition = d);
+    });
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _playingPath = null;
+          _playingPosition = Duration.zero;
+          _playingDuration = Duration.zero;
+        });
+      }
+    });
   }
 
   Future<void> _init() async {
@@ -118,7 +137,7 @@ class _RecorderPageState extends State<RecorderPage> {
       final path = await _recorder.stop();
       if (path != null && _currentPath != null) {
         setState(() {
-          _items.insert(0, _RecordingItem(_currentPath!));
+          _items.insert(0, _RecordingItem(_currentPath!, duration: _elapsed));
           _recording = false;
           _paused = false;
         });
@@ -164,18 +183,32 @@ class _RecorderPageState extends State<RecorderPage> {
     });
   }
 
-  Future<void> _togglePlay(String path) async {
-    if (_playingPath == path) {
+  Future<void> _togglePlay(_RecordingItem item) async {
+    if (_playingPath == item.path) {
       await _player.stop();
-      setState(() => _playingPath = null);
+      setState(() {
+        _playingPath = null;
+        _playingPosition = Duration.zero;
+        _playingDuration = Duration.zero;
+      });
       return;
     }
     await _player.stop();
-    await _player.play(DeviceFileSource(path));
-    setState(() => _playingPath = path);
-    _player.onPlayerComplete.first.then((_) {
-      if (mounted) setState(() => _playingPath = null);
+    await _player.play(DeviceFileSource(item.path));
+    setState(() {
+      _playingPath = item.path;
+      _playingPosition = Duration.zero;
+      _playingDuration = item.duration ?? Duration.zero;
     });
+  }
+
+  Future<void> _seek(double seconds) async {
+    if (_playingPath == null) return;
+    final target = Duration(milliseconds: (seconds * 1000).round());
+    setState(() => _playingPosition = target);
+    _seekTicking = true;
+    await _player.seek(target);
+    _seekTicking = false;
   }
 
   Future<void> _deleteRecording(_RecordingItem item) async {
@@ -186,6 +219,52 @@ class _RecorderPageState extends State<RecorderPage> {
       _playingPath = null;
     }
     setState(() => _items.remove(item));
+  }
+
+  Future<void> _renameRecording(_RecordingItem item) async {
+    final controller = TextEditingController(text: item.name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重命名录音'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: '名称（不包含扩展名）'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || newName == null || newName.isEmpty || newName == item.name) return;
+    final dir = File(item.path).parent.path;
+    final safe = newName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final target = '$dir${Platform.pathSeparator}$safe.m4a';
+    try {
+      await File(item.path).rename(target);
+      setState(() {
+        final idx = _items.indexOf(item);
+        if (idx >= 0) _items[idx] = _RecordingItem(target, duration: item.duration);
+      });
+      if (_playingPath == item.path) {
+        await _player.stop();
+        _playingPath = null;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('重命名失败：$e')));
+    }
+  }
+
+  Future<void> _copyPath(_RecordingItem item) async {
+    await Clipboard.setData(ClipboardData(text: item.path));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制文件路径')));
   }
 
   String _fmt(Duration d) {
@@ -320,38 +399,97 @@ class _RecorderPageState extends State<RecorderPage> {
                             final item = _items[index];
                             final playing = _playingPath == item.path;
                             return Card(
-                              child: ListTile(
-                                leading: Icon(
-                                  playing ? Icons.graphic_eq_rounded : Icons.audiotrack_rounded,
-                                  color: playing ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                                ),
-                                title: Text(
-                                  item.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  '${_fmt(item.duration)} · ${item.sizeLabel}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                                child: Column(
                                   children: [
-                                    IconButton(
-                                      tooltip: playing ? '停止' : '播放',
-                                      icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
-                                      onPressed: () => _togglePlay(item.path),
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(
+                                        playing ? Icons.graphic_eq_rounded : Icons.audiotrack_rounded,
+                                        color: playing ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                      ),
+                                      title: Text(
+                                        item.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        '${_fmt(playing ? _playingPosition : item.duration ?? Duration.zero)}'
+                                        '${playing && _playingDuration > Duration.zero ? ' / ${_fmt(_playingDuration)}' : ''}'
+                                        ' · ${item.sizeLabel}',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            tooltip: playing ? '停止' : '播放',
+                                            icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                                            onPressed: () => _togglePlay(item),
+                                          ),
+                                          PopupMenuButton<String>(
+                                            tooltip: '更多操作',
+                                            onSelected: (v) {
+                                              switch (v) {
+                                                case 'rename':
+                                                  _renameRecording(item);
+                                                  break;
+                                                case 'copy':
+                                                  _copyPath(item);
+                                                  break;
+                                              }
+                                            },
+                                            itemBuilder: (ctx) => const [
+                                              PopupMenuItem(
+                                                value: 'rename',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.drive_file_rename_outline_rounded, size: 20),
+                                                    SizedBox(width: 12),
+                                                    Text('重命名'),
+                                                  ],
+                                                ),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'copy',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.copy_rounded, size: 20),
+                                                    SizedBox(width: 12),
+                                                    Text('复制路径'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          IconButton(
+                                            tooltip: '删除',
+                                            icon: const Icon(Icons.delete_outline_rounded),
+                                            onPressed: () => _deleteRecording(item),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    IconButton(
-                                      tooltip: '删除',
-                                      icon: const Icon(Icons.delete_outline_rounded),
-                                      onPressed: () => _deleteRecording(item),
-                                    ),
+                                    // 播放进度条
+                                    if (playing) ...[
+                                      const SizedBox(height: 4),
+                                      Slider(
+                                        value: _playingDuration.inMilliseconds == 0
+                                            ? 0
+                                            : (_playingPosition.inMilliseconds /
+                                                    _playingDuration.inMilliseconds)
+                                                .clamp(0.0, 1.0),
+                                        onChanged: (v) => _seek(v * _playingDuration.inSeconds.toDouble()),
+                                        min: 0,
+                                        max: 1,
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -370,20 +508,14 @@ class _RecorderPageState extends State<RecorderPage> {
 
 /// 一条录音记录。
 class _RecordingItem {
-  _RecordingItem(this.path);
+  _RecordingItem(this.path, {this.duration});
 
   final String path;
+  Duration? duration;
 
   String get name {
     final base = path.split(Platform.pathSeparator).last;
     return base.replaceFirst(RegExp(r'^rec_'), '').replaceAll('.m4a', '');
-  }
-
-  Duration get duration {
-    final f = File(path);
-    // m4a 无轻量时长解析，此处以文件大小估算展示（约 16KB/s @128kbps）
-    final bytes = f.existsSync() ? f.lengthSync() : 0;
-    return Duration(milliseconds: (bytes * 8 / 128000 * 1000).round());
   }
 
   String get sizeLabel {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
@@ -62,12 +63,29 @@ class _StopwatchPageState extends State<StopwatchPage> {
     setState(() => _laps.insert(0, _stopwatch.elapsed));
   }
 
+  Future<void> _copyLaps() async {
+    if (_laps.isEmpty) return;
+    final sb = StringBuffer('秒表分段记录（共 ${_laps.length} 段，总 ${_fmt(_elapsed)}）\n');
+    for (var i = 0; i < _laps.length; i++) {
+      final lap = _laps[i];
+      final prev = i + 1 < _laps.length ? _laps[i + 1] : Duration.zero;
+      final delta = lap - prev;
+      sb.writeln('第 ${_laps.length - i} 段  ${_fmt(lap)}  (分段 ${_fmt(delta)})');
+    }
+    await Clipboard.setData(ClipboardData(text: sb.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('分段记录已复制到剪贴板')));
+  }
+
   String _fmt(Duration d) {
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    final days = d.inDays;
+    final h = d.inHours % 24;
+    final m = d.inMinutes % 60;
+    final s = d.inSeconds % 60;
     final ms = (d.inMilliseconds % 1000) ~/ 10;
-    return '$h:$m:$s.$ms';
+    final hms = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}.$ms';
+    if (days > 0) return '$days 天 $hms';
+    return hms;
   }
 
   @override
@@ -76,6 +94,14 @@ class _StopwatchPageState extends State<StopwatchPage> {
     final colorScheme = theme.colorScheme;
     return ToolPageScaffold(
       tool: _tool,
+      actions: [
+        if (_laps.isNotEmpty)
+          IconButton(
+            tooltip: '复制分段记录',
+            icon: const Icon(Icons.copy_rounded),
+            onPressed: _copyLaps,
+          ),
+      ],
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -145,12 +171,22 @@ class _StopwatchPageState extends State<StopwatchPage> {
                             ),
                             itemBuilder: (context, index) {
                               final lap = _laps[index];
+                              final prev = index + 1 < _laps.length ? _laps[index + 1] : Duration.zero;
+                              final delta = lap - prev;
+                              final best = _isBestLap(index);
                               return ListTile(
                                 dense: true,
                                 leading: Text(
                                   '分段 ${_laps.length - index}',
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                title: Text(
+                                  '本段 ${_fmt(delta)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: best ? colorScheme.tertiary : colorScheme.outline,
+                                    fontWeight: best ? FontWeight.w700 : FontWeight.normal,
                                   ),
                                 ),
                                 trailing: Text(
@@ -171,6 +207,15 @@ class _StopwatchPageState extends State<StopwatchPage> {
         ),
       ),
     );
+  }
+
+  bool _isBestLap(int index) {
+    final delta = _laps[index] - (index + 1 < _laps.length ? _laps[index + 1] : Duration.zero);
+    for (var i = 0; i < _laps.length; i++) {
+      final d = _laps[i] - (i + 1 < _laps.length ? _laps[i + 1] : Duration.zero);
+      if (d < delta) return false;
+    }
+    return true;
   }
 }
 

@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
 
-/// 倒计时工具：预设 + 自定义时长，圆环进度展示。
+/// 倒计时工具：预设 + 自定义时长，圆环进度展示，结束时震动 + 提示音。
 class CountdownPage extends StatefulWidget {
   const CountdownPage({super.key});
 
@@ -17,12 +18,15 @@ class CountdownPage extends StatefulWidget {
 class _CountdownPageState extends State<CountdownPage> {
   static final ToolInfo _tool = ToolRegistry.of('countdown');
 
-  static const List<int> _presets = [60, 180, 300, 600, 900, 1800, 3600];
+  static const List<int> _presets = [
+    10, 30, 45, 60, 120, 180, 300, 600, 900, 1500, 1800, 2700, 3600, 5400, 7200,
+  ];
 
   Duration _total = const Duration(minutes: 5);
   Duration _remaining = const Duration(minutes: 5);
   Timer? _timer;
   bool _running = false;
+  bool _alertEnabled = true;
 
   @override
   void dispose() {
@@ -54,6 +58,10 @@ class _CountdownPageState extends State<CountdownPage> {
       _remaining = Duration.zero;
       _running = false;
     });
+    if (_alertEnabled) {
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
+    }
     _showFinishedDialog();
   }
 
@@ -77,36 +85,57 @@ class _CountdownPageState extends State<CountdownPage> {
   }
 
   Future<void> _pickCustom() async {
-    final controller = TextEditingController();
-    final minutes = await showDialog<int>(
+    final mCtrl = TextEditingController();
+    final sCtrl = TextEditingController();
+    final result = await showDialog<(int, int)>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('自定义分钟数'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: '分钟（1 - 480）'),
+        title: const Text('自定义时长'),
+        content: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: mCtrl,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: '分钟'),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(':'),
+            ),
+            Expanded(
+              child: TextField(
+                controller: sCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '秒'),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           FilledButton(
             onPressed: () {
-              final v = int.tryParse(controller.text.trim());
-              Navigator.pop(ctx, v);
+              final m = int.tryParse(mCtrl.text.trim()) ?? 0;
+              final s = int.tryParse(sCtrl.text.trim()) ?? 0;
+              Navigator.pop(ctx, (m, s));
             },
             child: const Text('确定'),
           ),
         ],
       ),
     );
-    if (!mounted) return;
-    if (minutes != null && minutes > 0 && minutes <= 480) {
-      _setTotal(Duration(minutes: minutes));
-    } else if (minutes != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('请输入 1 - 480 之间的整数分钟')));
+    if (!mounted || result == null) return;
+    final seconds = result.$1 * 60 + result.$2;
+    if (seconds <= 0 || seconds > 24 * 3600) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入 1 秒 ~ 24 小时之间的时长')),
+      );
+      return;
     }
+    _setTotal(Duration(seconds: seconds));
   }
 
   void _showFinishedDialog() {
@@ -144,15 +173,24 @@ class _CountdownPageState extends State<CountdownPage> {
 
     return ToolPageScaffold(
       tool: _tool,
+      actions: [
+        IconButton(
+          tooltip: _alertEnabled ? '结束时提醒（开）' : '结束时提醒（关）',
+          icon: Icon(
+            _alertEnabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+          ),
+          onPressed: () => setState(() => _alertEnabled = !_alertEnabled),
+        ),
+      ],
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  const Spacer(),
+                  const SizedBox(height: 12),
                   // 圆环进度
                   SizedBox(
                     width: 240,
@@ -182,7 +220,7 @@ class _CountdownPageState extends State<CountdownPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _running ? '进行中' : '未开始',
+                              _running ? '进行中' : (_remaining == Duration.zero ? '已结束' : '未开始'),
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -230,7 +268,12 @@ class _CountdownPageState extends State<CountdownPage> {
                       ),
                     ],
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 16),
+                  Text(
+                    '结束时会震动并播放提示音（可点右上角开关）',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+                  ),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -241,8 +284,8 @@ class _CountdownPageState extends State<CountdownPage> {
   }
 
   String _label(int seconds) {
-    if (seconds % 3600 == 0) return '${seconds ~/ 3600} 小时';
-    if (seconds % 60 == 0) return '${seconds ~/ 60} 分钟';
+    if (seconds >= 3600 && seconds % 3600 == 0) return '${seconds ~/ 3600} 小时';
+    if (seconds >= 60 && seconds % 60 == 0) return '${seconds ~/ 60} 分钟';
     return '$seconds 秒';
   }
 }
