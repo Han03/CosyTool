@@ -13,6 +13,7 @@ import '../features/qrcode/qrcode_page.dart';
 import '../features/random_tool/random_number_page.dart';
 import '../features/recorder/recorder_page.dart';
 import '../features/stopwatch/stopwatch_page.dart';
+import '../features/text_tools/text_tools_page.dart';
 import '../models/tool_info.dart';
 
 /// 工具注册表。
@@ -132,6 +133,15 @@ class ToolRegistry {
       accent: const Color(0xFF3A9B6E),
       builder: (_) => const QrCodePage(),
       tags: const ['qr', 'encode'],
+    ),
+    ToolInfo(
+      id: 'text_tools',
+      name: '文本工具',
+      description: 'JSON / Base64 / 大小写 / 行处理',
+      icon: Icons.text_fields_rounded,
+      accent: const Color(0xFF8E5CF0),
+      builder: (_) => const TextToolsPage(),
+      tags: const ['text', 'json', 'format'],
     ),
   ];
 
