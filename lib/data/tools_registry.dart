@@ -6,6 +6,7 @@ import '../features/converter/converter_page.dart';
 import '../features/countdown/countdown_page.dart';
 import '../features/decibel/decibel_page.dart';
 import '../features/dice/dice_page.dart';
+import '../features/ear_monitor/ear_monitor_page.dart';
 import '../features/flashlight/flashlight_page.dart';
 import '../features/pomodoro/pomodoro_page.dart';
 import '../features/qrcode/qrcode_page.dart';
@@ -113,6 +114,15 @@ class ToolRegistry {
       builder: (_) => const FlashlightPage(),
       mobileOnly: true,
       tags: const ['light'],
+    ),
+    ToolInfo(
+      id: 'ear_monitor',
+      name: '耳返',
+      description: '极低延迟实时监听',
+      icon: Icons.headphones_rounded,
+      accent: const Color(0xFF4C7DF0),
+      builder: (_) => const EarMonitorPage(),
+      tags: const ['audio', 'monitor'],
     ),
     ToolInfo(
       id: 'qrcode',

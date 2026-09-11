@@ -69,3 +69,10 @@ app.*.map.json
 *.key
 *.pem
 secrets/
+
+# Debug dumps (adb screencap / uiautomator)
+*.png
+*.xml
+_p.py
+android/build/
+build/

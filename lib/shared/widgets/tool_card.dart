@@ -80,12 +80,15 @@ class ToolCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(
-                tool.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+              Flexible(
+                fit: FlexFit.loose,
+                child: Text(
+                  tool.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],

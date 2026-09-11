@@ -30,6 +30,8 @@ dependencies:
   shared_preferences: ^2.5.5
   # 保存照片到系统相册（延迟拍照）
   gal: ^2.3.3
+  # 耳返：miniaudio 原生双工回环（<15ms） + AEC 防啸叫
+  flutter_recorder: ^2.0.3
 
 dev_dependencies:
   flutter_test:
