@@ -14,6 +14,7 @@ import '../features/random_tool/random_number_page.dart';
 import '../features/recorder/recorder_page.dart';
 import '../features/stopwatch/stopwatch_page.dart';
 import '../features/text_tools/text_tools_page.dart';
+import '../features/word_count/word_count_page.dart';
 import '../models/tool_info.dart';
 
 /// 工具注册表。
@@ -142,6 +143,15 @@ class ToolRegistry {
       accent: const Color(0xFF8E5CF0),
       builder: (_) => const TextToolsPage(),
       tags: const ['text', 'json', 'format'],
+    ),
+    ToolInfo(
+      id: 'word_count',
+      name: '字数统计',
+      description: '实时统计字符 / 单词 / 段落',
+      icon: Icons.numbers_rounded,
+      accent: const Color(0xFF607D8B),
+      builder: (_) => const WordCountPage(),
+      tags: const ['text', 'count', 'word'],
     ),
   ];
 
