@@ -19,7 +19,7 @@ dependencies:
   # 应用文件目录
   path_provider: ^2.1.6
   # 延迟拍照（移动端）
-  camera: ^0.12.0+2
+  camera: ^0.12.1
   # 手电筒（移动端）
   torch_light: ^2.0.0
   # 二维码生成
