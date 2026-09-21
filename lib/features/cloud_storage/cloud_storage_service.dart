@@ -19,6 +19,21 @@ class StorageEntry {
   final String? sha;
 }
 
+/// Git Trees API 条目（拉取数据用）。
+class GitTreeItem {
+  const GitTreeItem({
+    required this.path,
+    required this.type,
+    required this.sha,
+    required this.size,
+  });
+
+  final String path;
+  final String type; // 'blob' | 'tree'
+  final String sha;
+  final int size;
+}
+
 /// 云端存储服务：基于 GitHub Contents API 的文件读写。
 ///
 /// 端点：
@@ -145,6 +160,46 @@ class CloudStorageService {
     if (resp.statusCode != 200 && resp.statusCode != 204) {
       throw CloudStorageException(_statusMessage(resp.statusCode));
     }
+  }
+
+  /// 获取仓库完整文件树（recursive）。
+  Future<List<GitTreeItem>> fetchTree({String branch = 'main'}) async {
+    final resp = await http.get(
+      Uri.parse('$_apiBase/repos/$owner/$repo/git/trees/$branch?recursive=1'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 20));
+    if (resp.statusCode != 200) {
+      throw CloudStorageException(_statusMessage(resp.statusCode));
+    }
+    final map = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final items = map['tree'] as List<dynamic>? ?? const [];
+    return items.map((e) {
+      final m = e as Map<String, dynamic>;
+      return GitTreeItem(
+        path: m['path'] as String? ?? '',
+        type: m['type'] as String? ?? 'blob',
+        sha: m['sha'] as String? ?? '',
+        size: (m['size'] as num?)?.toInt() ?? 0,
+      );
+    }).toList();
+  }
+
+  /// 按 blob sha 获取文件二进制内容。
+  Future<List<int>> fetchBlob(String sha) async {
+    final resp = await http
+        .get(Uri.parse('$_apiBase/repos/$owner/$repo/git/blobs/$sha'),
+            headers: _headers)
+        .timeout(const Duration(seconds: 30));
+    if (resp.statusCode != 200) {
+      throw CloudStorageException(_statusMessage(resp.statusCode));
+    }
+    final map = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final encoding = map['encoding'] as String? ?? 'base64';
+    if (encoding != 'base64') {
+      throw CloudStorageException('不支持的编码：$encoding');
+    }
+    final content = (map['content'] as String? ?? '').replaceAll(RegExp(r'\s'), '');
+    return base64Decode(content);
   }
 
   String _statusMessage(int code) {

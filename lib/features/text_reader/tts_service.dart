@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:http/http.dart' as http;
 
@@ -42,6 +44,9 @@ class TtsService {
   String voice = 'zh-CN-YunxiNeural';
   double speed = 1.0;
   double pitch = 0;
+
+  /// 语音缓存目录（数据文件夹 tts_cache/）；为 null 时不做磁盘缓存。
+  Directory? cacheDir;
 
   List<String> _sentences = const [];
   final Map<int, Uint8List> _audioCache = {};
@@ -155,6 +160,28 @@ class TtsService {
   }
 
   Future<Uint8List> _synthesize(String text) async {
+    // 磁盘缓存：命中直接读取，未命中合成后落盘（数据文件夹 tts_cache/）
+    final cache = cacheDir;
+    if (cache != null) {
+      final file = _cacheFile(cache, text);
+      if (await file.exists()) {
+        return file.readAsBytes();
+      }
+      final bytes = await _synthesizeRemote(text);
+      await file.writeAsBytes(bytes, flush: true);
+      return bytes;
+    }
+    return _synthesizeRemote(text);
+  }
+
+  /// 缓存文件名：`voice_pitch_<文本 sha256>.mp3`
+  File _cacheFile(Directory dir, String text) {
+    final key = '$voice|${pitch.round()}|$text';
+    final hash = sha256.convert(utf8.encode(key)).toString();
+    return File('${dir.path}${Platform.pathSeparator}${voice}_$hash.mp3');
+  }
+
+  Future<Uint8List> _synthesizeRemote(String text) async {
     final url = '$serviceUrl/v1/audio/speech';
     final resp = await http
         .post(
@@ -175,6 +202,20 @@ class TtsService {
     }
     if (resp.bodyBytes.isEmpty) throw Exception('空音频');
     return resp.bodyBytes;
+  }
+
+  /// 清空磁盘语音缓存。
+  Future<int> clearDiskCache() async {
+    final cache = cacheDir;
+    if (cache == null || !await cache.exists()) return 0;
+    var count = 0;
+    await for (final entity in cache.list()) {
+      if (entity is File && entity.path.endsWith('.mp3')) {
+        await entity.delete();
+        count += 1;
+      }
+    }
+    return count;
   }
 
   Future<void> _playBytes(Uint8List bytes) async {

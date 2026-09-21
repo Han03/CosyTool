@@ -13,6 +13,7 @@ import '../features/pomodoro/pomodoro_page.dart';
 import '../features/qrcode/qrcode_page.dart';
 import '../features/random_tool/random_number_page.dart';
 import '../features/recorder/recorder_page.dart';
+import '../features/settings/settings_page.dart';
 import '../features/stopwatch/stopwatch_page.dart';
 import '../features/text_reader/text_reader_page.dart';
 import '../features/text_tools/text_tools_page.dart';
@@ -172,6 +173,15 @@ class ToolRegistry {
       accent: const Color(0xFF2E7D32),
       builder: (_) => const CloudStoragePage(),
       tags: const ['cloud', 'storage', 'sync'],
+    ),
+    ToolInfo(
+      id: 'settings',
+      name: '设置',
+      description: '数据同步与目录管理',
+      icon: Icons.settings_rounded,
+      accent: const Color(0xFF546E7A),
+      builder: (_) => const SettingsPage(),
+      tags: const ['settings', 'sync'],
     ),
   ];
 
