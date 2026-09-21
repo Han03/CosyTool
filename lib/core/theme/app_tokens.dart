@@ -194,3 +194,6 @@ class AppMotion {
 
 /// 工具页内容宽度：窄屏 100%，宽屏统一 min(720, 可用宽 - 48)。
 const double kToolContentWidth = 720;
+
+/// 宽屏工具页（两栏布局）内容宽度。
+const double kToolContentWidthWide = 1100;

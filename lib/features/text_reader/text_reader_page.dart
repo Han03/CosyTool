@@ -356,7 +356,11 @@ class _TextReaderPageState extends State<TextReaderPage> {
         SafeArea(
           child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: BoxConstraints(
+              maxWidth: _useWideLayout && _mode == _ReaderMode.input
+                  ? kToolContentWidthWide
+                  : kToolContentWidth,
+            ),
             child: _mode == _ReaderMode.book && _bookFile != null
                 ? _buildBookView(theme, colorScheme)
                 : SingleChildScrollView(
@@ -396,7 +400,46 @@ class _TextReaderPageState extends State<TextReaderPage> {
     );
   }
 
+  // ---------------- 宽屏两栏 ----------------
+
+  /// 宽屏判定：桌面端且可用宽度足够放下两栏。
+  bool get _useWideLayout =>
+      Responsive.isDesktop(context) &&
+      MediaQuery.sizeOf(context).width >= 1040;
+
+  /// 输入模式：宽屏两栏（左：输入+设置；右：控制+句子列表），窄屏单列。
   Widget _buildInputView(ThemeData theme, ColorScheme colorScheme, TtsService? tts) {
+    if (_useWideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildInputCard(theme, colorScheme),
+                const SizedBox(height: 16),
+                _buildSettingsCard(theme, colorScheme),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (tts != null && tts.total > 0) ...[
+                  _buildControlBar(theme, colorScheme),
+                  const SizedBox(height: 16),
+                  _buildSentenceList(theme, colorScheme),
+                ] else
+                  _buildIdleHint(theme, colorScheme),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
