@@ -269,13 +269,14 @@ class _WordCountPageState extends State<WordCountPage> {
                   color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
                         _formatCount(item.$2),
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -283,17 +284,17 @@ class _WordCountPageState extends State<WordCountPage> {
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.$1,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 2),
+                      Text(
+                        item.$1,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ))
           .toList(),

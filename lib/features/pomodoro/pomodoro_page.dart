@@ -219,21 +219,22 @@ class _PomodoroPageState extends State<PomodoroPage> {
                     ),
                   ),
                   const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
                     children: [
                       OutlinedButton.icon(
                         onPressed: session.reset,
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('重置'),
                       ),
-                      const SizedBox(width: 12),
                       OutlinedButton.icon(
                         onPressed: session.isRunning ? null : session.skip,
                         icon: const Icon(Icons.skip_next_rounded),
                         label: Text(session.isBreak ? '跳过休息' : '跳过专注'),
                       ),
-                      const SizedBox(width: 12),
                       FilledButton.icon(
                         onPressed: session.isRunning ? session.pause : session.start,
                         icon: Icon(session.isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded),

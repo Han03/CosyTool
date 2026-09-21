@@ -114,6 +114,7 @@ class _UnitConverterPageState extends State<UnitConverterPage> {
                       Expanded(
                         child: DropdownButtonFormField<int>(
                           key: ValueKey('from-$_fromIndex'),
+                          isExpanded: true,
                           initialValue: _fromIndex,
                           decoration: const InputDecoration(labelText: '从'),
                           items: [
@@ -135,6 +136,7 @@ class _UnitConverterPageState extends State<UnitConverterPage> {
                       Expanded(
                         child: DropdownButtonFormField<int>(
                           key: ValueKey('to-$_toIndex'),
+                          isExpanded: true,
                           initialValue: _toIndex,
                           decoration: const InputDecoration(labelText: '到'),
                           items: [

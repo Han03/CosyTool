@@ -87,14 +87,13 @@ class _DecibelPageState extends State<DecibelPage> {
           ),
       ],
       child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
               child: Column(
                 children: [
-                  const Spacer(),
                   // 当前分贝值
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -171,7 +170,7 @@ class _DecibelPageState extends State<DecibelPage> {
                       _StatCard(label: '峰值', value: session.count == 0 ? '--' : '${session.max.round()} dB', color: colorScheme.error),
                     ],
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 20),
                   // 校准偏移
                   Row(
                     children: [

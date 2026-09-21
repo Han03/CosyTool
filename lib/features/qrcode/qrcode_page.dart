@@ -224,11 +224,9 @@ class _QrCodePageState extends State<QrCodePage> {
                     onSelect: (c) => setState(() => _background = c),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Text('尺寸', style: theme.textTheme.bodyMedium),
-                      const SizedBox(width: 12),
-                      SegmentedButton<double>(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final sizeSeg = SegmentedButton<double>(
                         segments: const [
                           ButtonSegment(value: 180, label: Text('小')),
                           ButtonSegment(value: 240, label: Text('中')),
@@ -237,11 +235,8 @@ class _QrCodePageState extends State<QrCodePage> {
                         selected: {_size},
                         onSelectionChanged: (s) => setState(() => _size = s.first),
                         style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                      ),
-                      const Spacer(),
-                      Text('纠错', style: theme.textTheme.bodyMedium),
-                      const SizedBox(width: 12),
-                      SegmentedButton<int>(
+                      );
+                      final eccSeg = SegmentedButton<int>(
                         segments: const [
                           ButtonSegment(value: QrErrorCorrectLevel.L, label: Text('L')),
                           ButtonSegment(value: QrErrorCorrectLevel.M, label: Text('M')),
@@ -251,8 +246,32 @@ class _QrCodePageState extends State<QrCodePage> {
                         selected: {_ecc},
                         onSelectionChanged: (s) => setState(() => _ecc = s.first),
                         style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                      ),
-                    ],
+                      );
+                      final sizeGroup = Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('尺寸', style: theme.textTheme.bodyMedium),
+                          const SizedBox(width: 12),
+                          sizeSeg,
+                        ],
+                      );
+                      final eccGroup = Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('纠错', style: theme.textTheme.bodyMedium),
+                          const SizedBox(width: 12),
+                          eccSeg,
+                        ],
+                      );
+                      if (constraints.maxWidth < 520) {
+                        return Wrap(
+                          spacing: 16,
+                          runSpacing: 10,
+                          children: [sizeGroup, eccGroup],
+                        );
+                      }
+                      return Row(children: [sizeGroup, const Spacer(), eccGroup]);
+                    },
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
