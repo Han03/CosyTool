@@ -13,11 +13,11 @@ import 'home_page.dart';
 
 /// 响应式应用外壳。
 ///
-/// - 桌面 / 平板：左侧固定导航栏 + 右侧内容区，点击导航切换内容
-/// - 手机：首页网格 + 抽屉导航，工具以全屏页面压入
+/// - 桌面 / 平板：左侧固定导航栏 + 右侧内容区
+/// - 手机：首页网格 + 抽屉导航
 ///
-/// 工具数量较多（12+），桌面侧采用可滚动的自定义侧边栏，
-/// 避免 NavigationRail 在矮屏上溢出。
+/// 侧栏只保留骨架入口（首页 / 设置 / 关于），工具一律在首页
+/// 搜索 / 命令面板（Ctrl+K）中打开，避免与首页内容重复。
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.themeController});
 
@@ -28,15 +28,19 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  /// 侧栏选中项：0=首页 1=设置 2=关于。
   int _selectedIndex = 0;
+
+  /// 当前内容区打开的工具（null 时显示侧栏项内容）。
+  ToolInfo? _currentTool;
 
   /// 首页搜索框焦点（桌面 Ctrl+F 注入）。
   final FocusNode _searchFocus = FocusNode();
 
-  /// 导航条目：首位为首页（null），其后依次为工具与关于页。
-  List<ToolInfo?> get _navTools => <ToolInfo?>[
+  /// 侧栏条目：首页（null）→ 设置 → 关于。
+  List<ToolInfo?> get _sidebarTools => <ToolInfo?>[
     null,
-    ...ToolRegistry.tools,
+    ToolRegistry.of('settings'),
     ToolRegistry.aboutTools.first,
   ];
 
@@ -46,14 +50,27 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
-  void _selectIndex(int index) => setState(() => _selectedIndex = index);
+  void _selectSidebar(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _currentTool = null;
+    });
+  }
 
+  /// 打开工具：设置 / 关于切换侧栏项，普通工具直接在内容区显示。
   void _openTool(BuildContext context, ToolInfo tool) {
     if (Responsive.isDesktop(context) || Responsive.isTablet(context)) {
-      final index = _navTools.indexOf(tool);
-      if (index >= 0) {
-        _selectIndex(index);
-      }
+      setState(() {
+        if (tool.id == 'settings') {
+          _selectedIndex = 1;
+          _currentTool = null;
+        } else if (tool.id == 'about') {
+          _selectedIndex = 2;
+          _currentTool = null;
+        } else {
+          _currentTool = tool;
+        }
+      });
     } else {
       Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => tool.builder(context)));
@@ -68,7 +85,9 @@ class _HomeShellState extends State<HomeShell> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
-          if (_selectedIndex != 0) _selectIndex(0);
+          if (_selectedIndex != 0 || _currentTool != null) {
+            _selectSidebar(0);
+          }
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _searchFocus.requestFocus();
           });
@@ -77,8 +96,7 @@ class _HomeShellState extends State<HomeShell> {
           LogicalKeyboardKey.comma,
           control: true,
         ): () {
-          final settings = ToolRegistry.of('settings');
-          _openTool(context, settings);
+          _selectSidebar(1);
         },
         const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
           showCommandPalette(
@@ -111,8 +129,8 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           _Sidebar(
             selectedIndex: _selectedIndex,
-            navTools: _navTools,
-            onSelected: _selectIndex,
+            sidebarTools: _sidebarTools,
+            onSelected: _selectSidebar,
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
@@ -129,18 +147,34 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Widget _buildPane(BuildContext context) {
-    final tool = _navTools[_selectedIndex];
-    if (tool == null) {
-      return HomePage(
-        key: const ValueKey('pane-home'),
-        searchFocusNode: _searchFocus,
-        onToolTap: (t) => _openTool(context, t),
+    // 内容区优先显示当前打开的工具
+    final tool = _currentTool;
+    if (tool != null) {
+      return KeyedSubtree(
+        key: ValueKey('pane-${tool.id}'),
+        child: tool.builder(context),
       );
     }
-    return KeyedSubtree(
-      key: ValueKey('pane-${tool.id}'),
-      child: tool.builder(context),
-    );
+    switch (_selectedIndex) {
+      case 1:
+        final settings = ToolRegistry.of('settings');
+        return KeyedSubtree(
+          key: const ValueKey('pane-settings'),
+          child: settings.builder(context),
+        );
+      case 2:
+        final about = ToolRegistry.aboutTools.first;
+        return KeyedSubtree(
+          key: const ValueKey('pane-about'),
+          child: about.builder(context),
+        );
+      default:
+        return HomePage(
+          key: const ValueKey('pane-home'),
+          searchFocusNode: _searchFocus,
+          onToolTap: (t) => _openTool(context, t),
+        );
+    }
   }
 
   // ---------------- 手机 ----------------
@@ -206,7 +240,14 @@ class _HomeShellState extends State<HomeShell> {
               ],
             ),
           ),
-          for (var i = 0; i < _navTools.length; i++) _drawerTile(context, i),
+          ListTile(
+            leading: const Icon(Icons.home_rounded),
+            title: const Text('首页'),
+            dense: true,
+            onTap: () => Navigator.of(context).pop(),
+          ),
+          for (var i = 1; i < _sidebarTools.length; i++)
+            _drawerTile(context, _sidebarTools[i]!),
           const Divider(),
           _buildAppearanceSection(context),
           Padding(
@@ -283,38 +324,36 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  Widget _drawerTile(BuildContext context, int index) {
-    final tool = _navTools[index];
+  Widget _drawerTile(BuildContext context, ToolInfo tool) {
     return ListTile(
-      leading: Icon(tool?.icon ?? Icons.home_rounded),
-      title: Text(tool?.name ?? '首页'),
+      leading: Icon(tool.icon),
+      title: Text(tool.name),
       dense: true,
       onTap: () {
         Navigator.of(context).pop();
-        if (tool == null) return;
         _openTool(context, tool);
       },
     );
   }
 }
 
-/// 桌面端左侧导航栏。
+/// 桌面端左侧导航栏：仅骨架入口（首页 / 设置 / 关于）。
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.selectedIndex,
-    required this.navTools,
+    required this.sidebarTools,
     required this.onSelected,
   });
 
   final int selectedIndex;
-  final List<ToolInfo?> navTools;
+  final List<ToolInfo?> sidebarTools;
   final ValueChanged<int> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final width = Responsive.isTablet(context) ? 210.0 : 236.0;
+    final width = Responsive.isTablet(context) ? 200.0 : 220.0;
 
     return SizedBox(
       width: width,
@@ -354,84 +393,88 @@ class _Sidebar extends StatelessWidget {
               ),
             ),
             const Divider(),
-            // 导航列表（可滚动）
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: navTools.length,
-                itemBuilder: (context, index) {
-                  final tool = navTools[index];
-                  final selected = index == selectedIndex;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    child: Row(
-                      children: [
-                        // 选中指示条（品牌绿）
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          width: 3,
-                          height: 22,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppThemeSeed.primary
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListTile(
-                            dense: true,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            selected: selected,
-                            selectedTileColor: colorScheme.primaryContainer
-                                .withValues(alpha: 0.55),
-                            leading: Icon(
-                              tool?.icon ?? Icons.home_rounded,
-                              size: 20,
-                              color: selected
-                                  ? colorScheme.onPrimaryContainer
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                            title: Text(
-                              tool?.name ?? '首页',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: selected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: selected
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.onSurface,
-                              ),
-                            ),
-                            onTap: () => onSelected(index),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            // 底部说明
+            // 骨架导航（固定 3 项，无需滚动）
+            for (var i = 0; i < sidebarTools.length; i++)
+              _sidebarTile(context, i, i == selectedIndex),
+            const Spacer(),
+            // 快捷提示
             Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                '${ToolRegistry.tools.length} 款常用工具',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.outline,
-                ),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.keyboard_command_key_rounded,
+                    size: 14,
+                    color: colorScheme.outline,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ctrl+K 快速搜索工具',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _sidebarTile(BuildContext context, int index, bool selected) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final tool = sidebarTools[index];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Row(
+        children: [
+          // 选中指示条（品牌绿）
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            width: 3,
+            height: 22,
+            margin: const EdgeInsets.only(right: 6),
+            decoration: BoxDecoration(
+              color: selected ? AppThemeSeed.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Expanded(
+            child: ListTile(
+              dense: true,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              selected: selected,
+              selectedTileColor:
+                  colorScheme.primaryContainer.withValues(alpha: 0.55),
+              leading: Icon(
+                tool?.icon ?? Icons.home_rounded,
+                size: 20,
+                color: selected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+              title: Text(
+                tool?.name ?? '首页',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurface,
+                ),
+              ),
+              onTap: () => onSelected(index),
+            ),
+          ),
+        ],
       ),
     );
   }
