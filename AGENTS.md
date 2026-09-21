@@ -5,6 +5,7 @@
 - **每次任务完成后，必须构建最新版桌面端**：
   `flutter build windows --release`（工作目录：仓库根目录）
   产物：`build\windows\x64\runner\Release\cosy_tool.exe`
+- **iOS 侧载包（sideload）**：仓库 `.github/workflows/ios_sideload.yml` 手动触发后产出**未签名 ipa**（`flutter build ios --release --no-codesign` → 打包 `Payload/Runner.app` → zip），在 GitHub Actions 页下载 artifact，用 **Sideloadly** 以免费 Apple ID 签名安装到真机（7 天有效期，Bundle ID `com.cosytool.cosytool`）。iOS 无证书时一律走此流程，不得要求付费开发者账号。
 - Windows 环境变量模板：
   `$env:Path += ";C:\flutter\bin"`
   `$env:PUB_HOSTED_URL="https://pub.flutter-io.cn"`

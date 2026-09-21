@@ -30,6 +30,8 @@
 	<string>CosyTool 需要使用麦克风进行录音和分贝测试。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>CosyTool 需要使用相机进行延迟拍照。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>CosyTool 需要保存生成的二维码图片到相册。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
