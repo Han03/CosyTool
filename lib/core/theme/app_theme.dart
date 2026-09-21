@@ -114,6 +114,16 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       tooltipTheme: const TooltipThemeData(waitDuration: Duration(milliseconds: 600)),
+      // 细滚动条：桌面端滚动条细窄、圆角、悬停显隐
+      scrollbarTheme: ScrollbarThemeData(
+        thumbVisibility: WidgetStatePropertyAll(false),
+        thickness: const WidgetStatePropertyAll(6),
+        radius: const Radius.circular(AppRadius.pill),
+        thumbColor: WidgetStatePropertyAll(
+          scheme.onSurfaceVariant.withValues(alpha: 0.35),
+        ),
+        trackColor: WidgetStatePropertyAll(Colors.transparent),
+      ),
     );
     return base.copyWith(
       textTheme: base.textTheme.copyWith(
