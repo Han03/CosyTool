@@ -283,18 +283,15 @@ class _TabItemState extends State<_TabItem> {
         height: 39,
         decoration: BoxDecoration(
           // 背景全透明：未选中/选中均融入 Tab 条；
-          // hover 反馈由 InkWell 的 Material 原生 ink 高亮单独承担
+          // hover 反馈由 InkWell 的 Material 原生 ink 高亮单独承担，
+          // 选中与未选中形状一致（顶部圆角，锚定于内容区）
           color: Colors.transparent,
-          borderRadius: widget.active
-              ? const BorderRadius.vertical(top: Radius.circular(10))
-              : BorderRadius.circular(10),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: widget.active
-                ? const BorderRadius.vertical(top: Radius.circular(10))
-                : BorderRadius.circular(10),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
             onTap: widget.onTap,
             child: Padding(
               padding: const EdgeInsets.only(left: 12, right: 12),
