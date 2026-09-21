@@ -33,8 +33,11 @@ class _HomeShellState extends State<HomeShell> {
   /// 侧栏选中项：0=首页 1=设置 2=关于。
   int _selectedIndex = 0;
 
-  /// 当前内容区打开的工具（null 时显示侧栏项内容）。
-  ToolInfo? _currentTool;
+  /// 已打开的工具 Tab（桌面端多开，同一工具复用）。
+  final List<ToolInfo> _tabs = [];
+
+  /// 激活的 Tab 下标；-1 表示显示侧栏项内容。
+  int _activeTab = -1;
 
   /// 首页搜索框焦点（桌面 Ctrl+F 注入）。
   final FocusNode _searchFocus = FocusNode();
@@ -58,28 +61,49 @@ class _HomeShellState extends State<HomeShell> {
   void _selectSidebar(int index) {
     setState(() {
       _selectedIndex = index;
-      _currentTool = null;
+      _activeTab = -1;
     });
   }
 
-  /// 打开工具：设置 / 关于切换侧栏项，普通工具直接在内容区显示。
+  /// 打开工具：设置 / 关于切换侧栏项；普通工具加入 Tab 多开（桌面）或压栈（手机）。
   void _openTool(BuildContext context, ToolInfo tool) {
     if (Responsive.isDesktop(context) || Responsive.isTablet(context)) {
       setState(() {
         if (tool.id == 'settings') {
           _selectedIndex = 1;
-          _currentTool = null;
+          _activeTab = -1;
         } else if (tool.id == 'about') {
           _selectedIndex = 2;
-          _currentTool = null;
+          _activeTab = -1;
         } else {
-          _currentTool = tool;
+          final idx = _tabs.indexWhere((t) => t.id == tool.id);
+          if (idx >= 0) {
+            _activeTab = idx;
+          } else {
+            _tabs.add(tool);
+            _activeTab = _tabs.length - 1;
+          }
         }
       });
     } else {
       Navigator.of(context)
           .push(MaterialPageRoute<void>(builder: (_) => tool.builder(context)));
     }
+  }
+
+  void _closeTab(int index) {
+    if (index < 0 || index >= _tabs.length) return;
+    setState(() {
+      _tabs.removeAt(index);
+      if (_activeTab == index) {
+        // 关闭激活 Tab：优先激活右侧，否则左侧，否则回侧栏
+        _activeTab = _tabs.isEmpty
+            ? -1
+            : (index < _tabs.length ? index : _tabs.length - 1);
+      } else if (_activeTab > index) {
+        _activeTab--;
+      }
+    });
   }
 
   /// 桌面快捷键：Ctrl+F 聚焦首页搜索、Ctrl+, 打开设置、Ctrl+K 命令面板。
@@ -90,7 +114,7 @@ class _HomeShellState extends State<HomeShell> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
-          if (_selectedIndex != 0 || _currentTool != null) {
+          if (_selectedIndex != 0 || _activeTab >= 0) {
             _selectSidebar(0);
           }
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -148,6 +172,14 @@ class _HomeShellState extends State<HomeShell> {
                         onOpenTool: (id) => _openToolById(context, id),
                         showMinimize: true,
                       ),
+                      if (_tabs.isNotEmpty)
+                        _TabStrip(
+                          tabs: _tabs,
+                          activeIndex: _activeTab,
+                          onSelect: (i) =>
+                              setState(() => _activeTab = i),
+                          onClose: _closeTab,
+                        ),
                       Expanded(
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 220),
@@ -183,11 +215,11 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Widget _buildPane(BuildContext context) {
-    // 内容区优先显示当前打开的工具
-    final tool = _currentTool;
-    if (tool != null) {
+    // 优先显示激活的工具 Tab
+    if (_activeTab >= 0 && _activeTab < _tabs.length) {
+      final tool = _tabs[_activeTab];
       return KeyedSubtree(
-        key: ValueKey('pane-${tool.id}'),
+        key: ValueKey('pane-tab-${tool.id}-$_activeTab'),
         child: tool.builder(context),
       );
     }
@@ -376,6 +408,91 @@ class _HomeShellState extends State<HomeShell> {
         Navigator.of(context).pop();
         _openTool(context, tool);
       },
+    );
+  }
+}
+
+/// 桌面端工具多开 Tab 条：同时容纳多个工具页，点击切换、可关闭。
+class _TabStrip extends StatelessWidget {
+  const _TabStrip({
+    required this.tabs,
+    required this.activeIndex,
+    required this.onSelect,
+    required this.onClose,
+  });
+
+  final List<ToolInfo> tabs;
+  final int activeIndex;
+  final ValueChanged<int> onSelect;
+  final ValueChanged<int> onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        border: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: tabs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final tool = tabs[index];
+          final active = index == activeIndex;
+          return Material(
+            color: active
+                ? colorScheme.primaryContainer.withValues(alpha: 0.6)
+                : colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => onSelect(index),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10, right: 2),
+                child: Row(
+                  children: [
+                    Icon(
+                      tool.icon,
+                      size: 16,
+                      color: active
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      tool.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    IconButton(
+                      tooltip: '关闭 ${tool.name}',
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 15,
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => onClose(index),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
