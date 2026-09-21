@@ -271,6 +271,11 @@ class _TabItemState extends State<_TabItem> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final showClose = _hover || widget.touch;
+    final fgColor = widget.active
+        ? colorScheme.primary
+        : _hover
+            ? colorScheme.onSurface
+            : colorScheme.onSurfaceVariant;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -278,11 +283,13 @@ class _TabItemState extends State<_TabItem> {
         duration: const Duration(milliseconds: 120),
         height: 39,
         decoration: BoxDecoration(
+          // 浏览器式：未选中默认透明融入 Tab 条，hover 才浮现浅背景；
+          // 选中由底层滑动激活背景提供（绿条 + 内容同色无缝）
           color: widget.active
               ? Colors.transparent
               : _hover
                   ? colorScheme.surfaceContainerHighest
-                  : colorScheme.surfaceContainerHigh,
+                  : Colors.transparent,
           borderRadius: widget.active
               ? const BorderRadius.vertical(top: Radius.circular(10))
               : BorderRadius.circular(10),
@@ -293,15 +300,45 @@ class _TabItemState extends State<_TabItem> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
             onTap: widget.onTap,
             child: Padding(
-              padding: const EdgeInsets.only(left: 12, right: 4),
+              padding: const EdgeInsets.only(left: 12, right: 12),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    widget.tool.icon,
-                    size: 16,
-                    color: widget.active
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
+                  // 图标与关闭按钮同位置淡入淡出：hover 时图标让位给 ×，
+                  // 不额外占位，Tab 宽度稳定，右侧不再留白
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 120),
+                          opacity: showClose ? 0 : 1,
+                          child: Icon(widget.tool.icon, size: 16, color: fgColor),
+                        ),
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 120),
+                          opacity: showClose ? 1 : 0,
+                          child: IconButton(
+                            tooltip: '关闭 ${widget.tool.name}',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 22,
+                              height: 22,
+                            ),
+                            iconSize: 16,
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: widget.active
+                                  ? colorScheme.onSurfaceVariant
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                            onPressed: widget.onClose,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 6),
                   ConstrainedBox(
@@ -316,20 +353,10 @@ class _TabItemState extends State<_TabItem> {
                             widget.active ? FontWeight.w700 : FontWeight.w500,
                         color: widget.active
                             ? colorScheme.onSurface
-                            : colorScheme.onSurfaceVariant,
+                            : _hover
+                                ? colorScheme.onSurface
+                                : colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 120),
-                    opacity: showClose ? 1 : 0,
-                    child: IconButton(
-                      tooltip: '关闭 ${widget.tool.name}',
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 16,
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: widget.onClose,
                     ),
                   ),
                 ],
