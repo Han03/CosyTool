@@ -43,10 +43,15 @@ class _TabStripState extends State<TabStrip> {
   @override
   void initState() {
     super.initState();
-    _touch = Theme.of(context).platform == TargetPlatform.android ||
-        Theme.of(context).platform == TargetPlatform.iOS;
     _syncKeys();
     _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _touch = Theme.of(context).platform == TargetPlatform.android ||
+        Theme.of(context).platform == TargetPlatform.iOS;
   }
 
   @override
@@ -134,6 +139,7 @@ class _TabStripState extends State<TabStrip> {
 
   @override
   Widget build(BuildContext context) {
+    _syncKeys();
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Container(

@@ -35,7 +35,7 @@ class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
   /// 已打开的工具 Tab（桌面端多开，同一工具复用）。
-  final List<ToolInfo> _tabs = [];
+  List<ToolInfo> _tabs = [];
 
   /// 激活的 Tab 下标；-1 表示显示侧栏项内容。
   int _activeTab = -1;
@@ -81,7 +81,7 @@ class _HomeShellState extends State<HomeShell> {
           if (idx >= 0) {
             _activeTab = idx;
           } else {
-            _tabs.add(tool);
+            _tabs = [..._tabs, tool];
             _activeTab = _tabs.length - 1;
           }
         }
@@ -95,7 +95,7 @@ class _HomeShellState extends State<HomeShell> {
   void _closeTab(int index) {
     if (index < 0 || index >= _tabs.length) return;
     setState(() {
-      _tabs.removeAt(index);
+      _tabs = List<ToolInfo>.of(_tabs)..removeAt(index);
       if (_activeTab == index) {
         // 关闭激活 Tab：优先激活右侧，否则左侧，否则回侧栏
         _activeTab = _tabs.isEmpty
