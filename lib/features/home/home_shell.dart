@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/responsive/responsive.dart';
@@ -7,6 +8,7 @@ import '../../core/theme/theme_controller.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/app_logo.dart';
+import 'command_palette.dart';
 import 'home_page.dart';
 
 /// 响应式应用外壳。
@@ -28,12 +30,21 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
 
+  /// 首页搜索框焦点（桌面 Ctrl+F 注入）。
+  final FocusNode _searchFocus = FocusNode();
+
   /// 导航条目：首位为首页（null），其后依次为工具与关于页。
   List<ToolInfo?> get _navTools => <ToolInfo?>[
     null,
     ...ToolRegistry.tools,
     ToolRegistry.aboutTools.first,
   ];
+
+  @override
+  void dispose() {
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   void _selectIndex(int index) => setState(() => _selectedIndex = index);
 
@@ -49,13 +60,47 @@ class _HomeShellState extends State<HomeShell> {
     }
   }
 
+  /// 桌面快捷键：Ctrl+F 聚焦首页搜索、Ctrl+, 打开设置、Ctrl+K 命令面板。
+  Widget _withShortcuts(BuildContext context, Widget child) {
+    final isDesktop =
+        Responsive.isDesktop(context) || Responsive.isTablet(context);
+    if (!isDesktop) return child;
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
+          if (_selectedIndex != 0) _selectIndex(0);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _searchFocus.requestFocus();
+          });
+        },
+        const SingleActivator(
+          LogicalKeyboardKey.comma,
+          control: true,
+        ): () {
+          final settings = ToolRegistry.of('settings');
+          _openTool(context, settings);
+        },
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
+          showCommandPalette(
+            context,
+            onSelected: (t) => _openTool(context, t),
+          );
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final type = Responsive.of(context);
-    if (type == ScreenType.desktop || type == ScreenType.tablet) {
-      return _buildSidebarLayout(context);
-    }
-    return _buildMobileLayout(context);
+    final shell = type == ScreenType.desktop || type == ScreenType.tablet
+        ? _buildSidebarLayout(context)
+        : _buildMobileLayout(context);
+    return _withShortcuts(context, shell);
   }
 
   // ---------------- 桌面 / 平板 ----------------
@@ -88,6 +133,7 @@ class _HomeShellState extends State<HomeShell> {
     if (tool == null) {
       return HomePage(
         key: const ValueKey('pane-home'),
+        searchFocusNode: _searchFocus,
         onToolTap: (t) => _openTool(context, t),
       );
     }

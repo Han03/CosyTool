@@ -36,6 +36,7 @@ dependencies:
   http: ^1.2.0
   # TTS 语音缓存 / 文件哈希
   crypto: ^3.0.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

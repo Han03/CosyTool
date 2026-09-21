@@ -34,9 +34,12 @@ const List<_ToolGroup> _groups = [
 
 /// 首页：工具总览（分组 + 桌面搜索）。
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.onToolTap});
+  const HomePage({super.key, required this.onToolTap, this.searchFocusNode});
 
   final ValueChanged<ToolInfo> onToolTap;
+
+  /// 外部注入的搜索框焦点（桌面快捷键 Ctrl+F 使用）；为空时内部创建。
+  final FocusNode? searchFocusNode;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -45,12 +48,18 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
-  final FocusNode _searchFocus = FocusNode();
+  late final FocusNode _searchFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocus = widget.searchFocusNode ?? FocusNode();
+  }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _searchFocus.dispose();
+    if (widget.searchFocusNode == null) _searchFocus.dispose();
     super.dispose();
   }
 

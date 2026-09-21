@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/responsive/responsive.dart';
@@ -107,10 +108,16 @@ class AboutPage extends StatelessWidget {
                       title: const Text('github.com/Han03/CosyTool'),
                       subtitle: const Text('源码仓库 · 欢迎 Star'),
                       trailing: const Icon(Icons.open_in_new_rounded, size: 18),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('请在浏览器中打开 github.com/Han03/CosyTool')),
+                      onTap: () async {
+                        final ok = await launchUrl(
+                          Uri.parse('https://github.com/Han03/CosyTool'),
+                          mode: LaunchMode.externalApplication,
                         );
+                        if (!ok && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('无法打开浏览器，请手动访问 github.com/Han03/CosyTool')),
+                          );
+                        }
                       },
                     ),
                   ),

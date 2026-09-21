@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../core/data/app_data.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
+import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
 import 'tts_service.dart';
 
@@ -866,13 +867,11 @@ class _BookPickerDialogState extends State<_BookPickerDialog> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _entries.isEmpty
-                ? Center(
-                    child: Text(
-                      'books/ 目录下没有 .txt 文件\n请先放入小说或从云端拉取',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
+                ? EmptyState(
+                    compact: true,
+                    icon: Icons.menu_book_rounded,
+                    title: 'books/ 目录下没有小说',
+                    message: '请先放入 .txt 文件或从云端拉取',
                   )
                 : ListView(
                     children: [

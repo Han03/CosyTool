@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/data/app_data.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
+import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
 import '../cloud_storage/cloud_storage_service.dart';
 import 'data_sync_service.dart';
@@ -562,15 +563,17 @@ class _SettingsPageState extends State<SettingsPage> {
         _buildBreadcrumb(theme),
         const SizedBox(height: 8),
         if (_entries.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Center(
-              child: Text(
-                _fileBusy ? '加载中…' : '仓库为空，可在下方新建文件',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ),
-          )
+          _fileBusy
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : EmptyState(
+                  compact: true,
+                  icon: Icons.folder_open_rounded,
+                  title: '仓库为空',
+                  message: '可在下方新建文件，或点击「拉取数据」从 GitHub 同步',
+                )
         else
           ..._entries.map((e) => _buildEntryTile(theme, e)),
         const Divider(height: 24),
