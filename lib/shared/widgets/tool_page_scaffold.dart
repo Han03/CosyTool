@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_tokens.dart';
 import '../../models/tool_info.dart';
 
 /// 工具页面的统一外壳。
 ///
 /// 所有工具页面复用该组件，保证标题栏风格一致：
-/// 左侧为工具图标 + 名称，右侧可挂载操作按钮。
+/// 左侧为品牌绿图标 + 名称，右侧可挂载操作按钮。
 class ToolPageScaffold extends StatelessWidget {
   const ToolPageScaffold({
     super.key,
@@ -30,13 +31,10 @@ class ToolPageScaffold extends StatelessWidget {
               height: 30,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    tool.accent,
-                    tool.accent.withValues(alpha: 0.7),
-                  ],
+                  colors: [BrandColors.primary, BrandColors.secondary],
                 ),
               ),
               child: Icon(tool.icon, color: Colors.white, size: 17),

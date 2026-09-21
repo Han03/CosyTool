@@ -290,7 +290,7 @@ class _RecorderPageState extends State<RecorderPage> {
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
+            constraints: const BoxConstraints(maxWidth: 720),
             child: Column(
               children: [
                 // 录制控制区

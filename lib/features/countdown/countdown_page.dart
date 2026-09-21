@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
@@ -142,7 +143,11 @@ class _CountdownPageState extends State<CountdownPage> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.notifications_active_rounded, size: 40, color: Color(0xFFE85D5D)),
+        icon: Icon(
+          Icons.notifications_active_rounded,
+          size: 40,
+          color: Theme.of(ctx).extension<AppSemanticColors>()!.danger,
+        ),
         title: const Text('时间到！'),
         content: const Text('倒计时已结束。'),
         actions: [

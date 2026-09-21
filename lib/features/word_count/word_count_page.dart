@@ -143,7 +143,7 @@ class _WordCountPageState extends State<WordCountPage> {
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
+            constraints: const BoxConstraints(maxWidth: 720),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(

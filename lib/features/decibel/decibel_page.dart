@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/theme/app_tokens.dart';
 import '../../core/utils/permissions.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
@@ -177,15 +178,17 @@ class _DecibelPageState extends State<DecibelPage> {
 
   double get _avg => _count == 0 ? 0 : _sum / _count;
 
-  (String, Color) get _levelInfo {
+  (String, Color) _levelInfo(BuildContext context) {
+    final theme = Theme.of(context);
+    final s = theme.extension<AppSemanticColors>()!;
     final d = _current;
-    if (d < 40) return ('非常安静', const Color(0xFF7A8AA0));
-    if (d < 50) return ('安静', const Color(0xFF3A9B6E));
-    if (d < 60) return ('正常交谈', const Color(0xFF2F9E6E));
-    if (d < 70) return ('环境较吵', const Color(0xFFF09B3A));
-    if (d < 80) return ('吵闹', const Color(0xFFE8663A));
-    if (d < 90) return ('很吵', const Color(0xFFE85D5D));
-    return ('震耳欲聋', const Color(0xFFB3253A));
+    if (d < 40) return ('非常安静', theme.colorScheme.outline);
+    if (d < 50) return ('安静', s.success);
+    if (d < 60) return ('正常交谈', s.success);
+    if (d < 70) return ('环境较吵', s.warning);
+    if (d < 80) return ('吵闹', s.warning);
+    if (d < 90) return ('很吵', s.danger);
+    return ('震耳欲聋', s.danger);
   }
 
   String _fmtDur(Duration d) {
@@ -226,7 +229,7 @@ class _DecibelPageState extends State<DecibelPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final (levelText, levelColor) = _levelInfo;
+    final (levelText, levelColor) = _levelInfo(context);
 
     return ToolPageScaffold(
       tool: _tool,
@@ -241,7 +244,7 @@ class _DecibelPageState extends State<DecibelPage> {
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
+            constraints: const BoxConstraints(maxWidth: 720),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(

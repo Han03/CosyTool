@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'app_tokens.dart';
+
 /// 全局主题配置（Material 3）。
 ///
-/// 以青蓝色为品牌种子色，提供浅色 / 深色两套主题，并统一
+/// 以品牌绿为种子色，提供浅色 / 深色两套主题，并统一
 /// 卡片、按钮、输入框等组件的视觉风格。
-/// 品牌渐变使用的种子色（供导航 / Logo 等直接引用）。
 class AppThemeSeed {
   AppThemeSeed._();
 
-  static const Color primary = Color(0xFF0E9F8F);
-  static const Color secondary = Color(0xFF37B6C9);
+  static const Color primary = BrandColors.primary;
+  static const Color secondary = BrandColors.secondary;
 }
 
 class AppTheme {
@@ -22,7 +23,7 @@ class AppTheme {
       seedColor: _seed,
       brightness: Brightness.light,
     );
-    return _build(scheme);
+    return _build(scheme).copyWith(extensions: [AppSemanticColors.light]);
   }
 
   static ThemeData dark() {
@@ -30,7 +31,7 @@ class AppTheme {
       seedColor: _seed,
       brightness: Brightness.dark,
     );
-    return _build(scheme);
+    return _build(scheme).copyWith(extensions: [AppSemanticColors.dark]);
   }
 
   static ThemeData _build(ColorScheme scheme) {
@@ -53,7 +54,12 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+        ),
         color: scheme.surfaceContainerLow,
         margin: EdgeInsets.zero,
       ),
@@ -79,11 +85,11 @@ class AppTheme {
         filled: true,
         fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: scheme.primary, width: 1.4),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -91,7 +97,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 44),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),

@@ -12,6 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 // ignore_for_file: experimental_member_use
 
+import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
@@ -398,7 +399,7 @@ Future<void> _runLatencyTest() async {
   }
 
   Widget _buildMonitorCard(ThemeData theme, ColorScheme colorScheme) {
-    final accent = _on ? _tool.accent : colorScheme.surfaceContainerHighest;
+    final accent = _on ? BrandColors.primary : colorScheme.surfaceContainerHighest;
     final fg = _on ? Colors.white : colorScheme.onSurfaceVariant;
     return Card(
       elevation: 0,
@@ -445,7 +446,7 @@ Future<void> _runLatencyTest() async {
                       : '点击开启耳返',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: _on ? _tool.accent : null,
+                color: _on ? BrandColors.primary : null,
               ),
             ),
             const SizedBox(height: 4),
@@ -482,7 +483,7 @@ Future<void> _runLatencyTest() async {
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontFeatures: const [FontFeature.tabularFigures()],
-                    color: _on ? _tool.accent : null,
+                    color: _on ? BrandColors.primary : null,
                   ),
                 ),
               ],
@@ -495,10 +496,10 @@ Future<void> _runLatencyTest() async {
                 minHeight: 8,
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 color: _db < -40
-                    ? const Color(0xFF3AA6C9)
+                    ? theme.extension<AppSemanticColors>()!.info
                     : _db < -20
-                        ? const Color(0xFF2F9E6E)
-                        : const Color(0xFFE85D5D),
+                        ? theme.extension<AppSemanticColors>()!.success
+                        : theme.extension<AppSemanticColors>()!.danger,
               ),
             ),
             const SizedBox(height: 12),
@@ -508,7 +509,7 @@ Future<void> _runLatencyTest() async {
                 size: Size.infinite,
                 painter: _WavePainter(
                   wave: _wave,
-                  color: _tool.accent,
+                  color: _on ? BrandColors.primary : theme.colorScheme.outlineVariant,
                   lineColor: theme.colorScheme.outlineVariant,
                 ),
               ),
@@ -617,8 +618,8 @@ Future<void> _runLatencyTest() async {
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: _lastLatencyMs! < 80
-                          ? const Color(0xFF2F9E6E)
-                          : const Color(0xFFE85D5D),
+                          ? theme.extension<AppSemanticColors>()!.success
+                          : theme.extension<AppSemanticColors>()!.danger,
                     ),
                   ),
               ],

@@ -24,7 +24,7 @@ class AboutPage extends StatelessWidget {
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
+            constraints: const BoxConstraints(maxWidth: 720),
             child: SingleChildScrollView(
               padding: EdgeInsets.all(isDesktop ? 40 : 24),
               child: Column(

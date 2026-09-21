@@ -290,7 +290,7 @@ class _TextReaderPageState extends State<TextReaderPage> {
       child: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(maxWidth: 720),
             child: _mode == _ReaderMode.book && _bookFile != null
                 ? _buildBookView(theme, colorScheme)
                 : SingleChildScrollView(
