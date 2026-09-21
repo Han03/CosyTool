@@ -90,6 +90,15 @@ class _SessionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 胶囊自监听所属 Session：状态文本（剩余时间/时长等）实时刷新，
+    // 只重建自身，不触发整条状态条重建。
+    return ListenableBuilder(
+      listenable: session,
+      builder: (context, _) => _buildChip(context),
+    );
+  }
+
+  Widget _buildChip(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Material(
