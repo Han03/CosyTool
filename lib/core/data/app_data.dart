@@ -70,6 +70,27 @@ class AppData {
   static Future<String> toolPath(String toolId) async =>
       (await toolDir(toolId)).path;
 
+  /// 本机机密文件（不入仓库）：CosyToolData/secrets/token.txt。
+  /// 用于存放 GitHub Token 等本机私有凭据，设置页默认自动读取填入。
+  static Future<File> secretsTokenFile() async {
+    final rootDir = await root();
+    final dir =
+        Directory('${rootDir.path}${Platform.pathSeparator}secrets');
+    await dir.create(recursive: true);
+    return File('${dir.path}${Platform.pathSeparator}token.txt');
+  }
+
+  /// 读取本机已保存的 GitHub Token；不存在则返回空字符串。
+  static Future<String> readSecretsToken() async {
+    try {
+      final file = await secretsTokenFile();
+      if (await file.exists()) return (await file.readAsString()).trim();
+    } catch (_) {
+      // 读取失败按未配置处理
+    }
+    return '';
+  }
+
   /// 在系统文件管理器中打开目录（桌面端；移动端忽略）。
   static Future<void> reveal(String path) async {
     try {

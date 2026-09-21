@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../features/about/about_page.dart';
 import '../features/camera_timer/camera_timer_page.dart';
-import '../features/cloud_storage/cloud_storage_page.dart';
 import '../features/converter/converter_page.dart';
 import '../features/countdown/countdown_page.dart';
 import '../features/decibel/decibel_page.dart';
@@ -166,22 +165,13 @@ class ToolRegistry {
       tags: const ['text', 'audio', 'tts'],
     ),
     ToolInfo(
-      id: 'cloud_storage',
-      name: '云端存储',
-      description: 'GitHub 仓库保存配置与文件',
-      icon: Icons.cloud_upload_rounded,
-      accent: const Color(0xFF2E7D32),
-      builder: (_) => const CloudStoragePage(),
-      tags: const ['cloud', 'storage', 'sync'],
-    ),
-    ToolInfo(
       id: 'settings',
       name: '设置',
-      description: '数据同步与目录管理',
+      description: '云端存储 · 数据同步 · 目录管理',
       icon: Icons.settings_rounded,
       accent: const Color(0xFF546E7A),
       builder: (_) => const SettingsPage(),
-      tags: const ['settings', 'sync'],
+      tags: const ['settings', 'sync', 'cloud', 'storage'],
     ),
   ];
 
