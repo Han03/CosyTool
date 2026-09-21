@@ -279,17 +279,12 @@ class _TabItemState extends State<_TabItem> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
+      child: Container(
         height: 39,
         decoration: BoxDecoration(
-          // 浏览器式：未选中默认透明融入 Tab 条，hover 才浮现浅背景；
-          // 选中由底层滑动激活背景提供（绿条 + 内容同色无缝）
-          color: widget.active
-              ? Colors.transparent
-              : _hover
-                  ? colorScheme.surfaceContainerHighest
-                  : Colors.transparent,
+          // 背景全透明：未选中/选中均融入 Tab 条；
+          // hover 反馈由 InkWell 的 Material 原生 ink 高亮单独承担
+          color: Colors.transparent,
           borderRadius: widget.active
               ? const BorderRadius.vertical(top: Radius.circular(10))
               : BorderRadius.circular(10),
@@ -297,10 +292,9 @@ class _TabItemState extends State<_TabItem> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            // hover 反馈由 AnimatedContainer 背景单独承担，
-            // 禁用 InkWell 自带的 hover 高亮层，避免两层叠加
-            hoverColor: Colors.transparent,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+            borderRadius: widget.active
+                ? const BorderRadius.vertical(top: Radius.circular(10))
+                : BorderRadius.circular(10),
             onTap: widget.onTap,
             child: Padding(
               padding: const EdgeInsets.only(left: 12, right: 12),
