@@ -155,6 +155,9 @@ class _HomeShellState extends State<HomeShell> {
   Widget _buildSidebarLayout(BuildContext context) {
     return Scaffold(
       body: Row(
+        // stretch: tight cross-axis so the content Stack does not collapse to 0 height
+        // (Positioned.fill does not size a Stack; loose constraints would shrink it)
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Sidebar(
             selectedIndex: _selectedIndex,
