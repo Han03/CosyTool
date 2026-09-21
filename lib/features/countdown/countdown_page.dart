@@ -1,15 +1,14 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../../core/session/session_registry.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/app_dialog.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
+import 'countdown_session.dart';
 
-/// 倒计时工具：预设 + 自定义时长，圆环进度展示，结束时震动 + 提示音。
+/// 倒计时工具：预设 + 自定义时长，圆环进度展示（引擎常驻，切页不断）。
 class CountdownPage extends StatefulWidget {
   const CountdownPage({super.key});
 
@@ -24,66 +23,33 @@ class _CountdownPageState extends State<CountdownPage> {
     10, 30, 45, 60, 120, 180, 300, 600, 900, 1500, 1800, 2700, 3600, 5400, 7200,
   ];
 
-  Duration _total = const Duration(minutes: 5);
-  Duration _remaining = const Duration(minutes: 5);
-  Timer? _timer;
-  bool _running = false;
-  bool _alertEnabled = true;
+  late final CountdownSession _session;
+
+  /// 结束弹窗只弹一次；切回页面时若已结束则补弹。
+  bool _finishedHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = SessionRegistry.instance.sessionOf('countdown', CountdownSession.new);
+    _session.addListener(_onChanged);
+  }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _session.removeListener(_onChanged);
     super.dispose();
   }
 
-  void _start() {
-    setState(() => _running = true);
-    _timer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      if (_remaining <= const Duration(milliseconds: 200)) {
-        _finish();
-        return;
-      }
-      setState(() => _remaining -= const Duration(milliseconds: 200));
-    });
-  }
-
-  void _pause() {
-    _timer?.cancel();
-    _timer = null;
-    setState(() => _running = false);
-  }
-
-  void _finish() {
-    _timer?.cancel();
-    _timer = null;
-    setState(() {
-      _remaining = Duration.zero;
-      _running = false;
-    });
-    if (_alertEnabled) {
-      HapticFeedback.heavyImpact();
-      SystemSound.play(SystemSoundType.alert);
+  void _onChanged() {
+    if (!mounted) return;
+    setState(() {});
+    if (_session.finished && !_finishedHandled) {
+      _finishedHandled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _session.finished) _showFinishedDialog();
+      });
     }
-    _showFinishedDialog();
-  }
-
-  void _reset() {
-    _timer?.cancel();
-    _timer = null;
-    setState(() {
-      _remaining = _total;
-      _running = false;
-    });
-  }
-
-  void _setTotal(Duration d) {
-    _timer?.cancel();
-    _timer = null;
-    setState(() {
-      _total = d;
-      _remaining = d;
-      _running = false;
-    });
   }
 
   Future<void> _pickCustom() async {
@@ -137,7 +103,8 @@ class _CountdownPageState extends State<CountdownPage> {
       );
       return;
     }
-    _setTotal(Duration(seconds: seconds));
+    _finishedHandled = false;
+    _session.setTotal(Duration(seconds: seconds));
   }
 
   void _showFinishedDialog() {
@@ -156,31 +123,32 @@ class _CountdownPageState extends State<CountdownPage> {
     );
   }
 
-  String _fmt(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  void _toggleAlert() {
+    setState(() => _session.alertEnabled = !_session.alertEnabled);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final progress = _total.inMilliseconds == 0
+    final total = _session.total;
+    final remaining = _session.remaining;
+    final running = _session.isRunning;
+    final progress = total.inMilliseconds == 0
         ? 0.0
-        : (_total.inMilliseconds - _remaining.inMilliseconds) / _total.inMilliseconds;
+        : (total.inMilliseconds - remaining.inMilliseconds) / total.inMilliseconds;
 
     return ToolPageScaffold(
       tool: _tool,
       actions: [
         IconButton(
-          tooltip: _alertEnabled ? '结束时提醒（开）' : '结束时提醒（关）',
+          tooltip: _session.alertEnabled ? '结束时提醒（开）' : '结束时提醒（关）',
           icon: Icon(
-            _alertEnabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+            _session.alertEnabled
+                ? Icons.notifications_active_rounded
+                : Icons.notifications_off_rounded,
           ),
-          onPressed: () => setState(() => _alertEnabled = !_alertEnabled),
+          onPressed: _toggleAlert,
         ),
       ],
       child: SafeArea(
@@ -203,7 +171,7 @@ class _CountdownPageState extends State<CountdownPage> {
                           width: 240,
                           height: 240,
                           child: CircularProgressIndicator(
-                            value: _running || _remaining != _total ? progress : 0,
+                            value: running || remaining != total ? progress : 0,
                             strokeWidth: 12,
                             strokeCap: StrokeCap.round,
                             backgroundColor: colorScheme.surfaceContainerHighest,
@@ -228,8 +196,8 @@ class _CountdownPageState extends State<CountdownPage> {
                                 ),
                               ),
                               child: Text(
-                                _fmt(_remaining),
-                                key: ValueKey(_fmt(_remaining)),
+                                CountdownSession.fmt(remaining),
+                                key: ValueKey(CountdownSession.fmt(remaining)),
                                 style: theme.textTheme.displayMedium?.copyWith(
                                   fontWeight: FontWeight.w300,
                                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -238,7 +206,9 @@ class _CountdownPageState extends State<CountdownPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _running ? '进行中' : (_remaining == Duration.zero ? '已结束' : '未开始'),
+                              running
+                                  ? '进行中'
+                                  : (remaining == Duration.zero ? '已结束' : '未开始'),
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -258,8 +228,11 @@ class _CountdownPageState extends State<CountdownPage> {
                       for (final p in _presets)
                         ChoiceChip(
                           label: Text(_label(p)),
-                          selected: _total.inSeconds == p,
-                          onSelected: (_) => _setTotal(Duration(seconds: p)),
+                          selected: total.inSeconds == p,
+                          onSelected: (_) {
+                            _finishedHandled = false;
+                            _session.setTotal(Duration(seconds: p));
+                          },
                         ),
                       ActionChip(
                         avatar: const Icon(Icons.edit_rounded, size: 16),
@@ -274,15 +247,25 @@ class _CountdownPageState extends State<CountdownPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: _remaining == _total ? null : _reset,
+                        onPressed: remaining == total
+                            ? null
+                            : () {
+                                _finishedHandled = false;
+                                _session.reset();
+                              },
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('重置'),
                       ),
                       const SizedBox(width: 16),
                       FilledButton.icon(
-                        onPressed: _running ? _pause : _start,
-                        icon: Icon(_running ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                        label: Text(_running ? '暂停' : '开始'),
+                        onPressed: running
+                            ? _session.pause
+                            : () {
+                                _finishedHandled = false;
+                                _session.start();
+                              },
+                        icon: Icon(running ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                        label: Text(running ? '暂停' : '开始'),
                       ),
                     ],
                   ),

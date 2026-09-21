@@ -8,6 +8,7 @@ import '../../core/theme/theme_controller.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/running_sessions_bar.dart';
 import 'command_palette.dart';
 import 'home_page.dart';
 
@@ -134,16 +135,28 @@ class _HomeShellState extends State<HomeShell> {
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              switchInCurve: Curves.easeOut,
-              switchOutCurve: Curves.easeIn,
-              child: _buildPane(context),
+            child: Column(
+              children: [
+                RunningSessionsBar(onOpenTool: (id) => _openToolById(context, id)),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: _buildPane(context),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _openToolById(BuildContext context, String toolId) {
+    final tool = ToolRegistry.of(toolId);
+    _openTool(context, tool);
   }
 
   Widget _buildPane(BuildContext context) {
@@ -193,7 +206,14 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       drawer: _buildDrawer(context),
-      body: HomePage(onToolTap: (t) => _openTool(context, t)),
+      body: Column(
+        children: [
+          RunningSessionsBar(onOpenTool: (id) => _openToolById(context, id)),
+          Expanded(
+            child: HomePage(onToolTap: (t) => _openTool(context, t)),
+          ),
+        ],
+      ),
     );
   }
 

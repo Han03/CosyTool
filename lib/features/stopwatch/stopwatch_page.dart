@@ -1,13 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/session/session_registry.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
+import 'stopwatch_session.dart';
 
-/// 秒表工具：计时 + 分段记录。
+/// 秒表工具：计时 + 分段记录（引擎常驻，切页不断）。
 class StopwatchPage extends StatefulWidget {
   const StopwatchPage({super.key});
 
@@ -18,84 +18,55 @@ class StopwatchPage extends StatefulWidget {
 class _StopwatchPageState extends State<StopwatchPage> {
   static final ToolInfo _tool = ToolRegistry.of('stopwatch');
 
-  final Stopwatch _stopwatch = Stopwatch();
-  Timer? _timer;
-  final List<Duration> _laps = [];
-  Duration _elapsed = Duration.zero;
+  late final StopwatchSession _session;
 
-  bool get _running => _stopwatch.isRunning;
+  @override
+  void initState() {
+    super.initState();
+    _session = SessionRegistry.instance.sessionOf('stopwatch', StopwatchSession.new);
+    _session.addListener(_onChanged);
+  }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _session.removeListener(_onChanged);
     super.dispose();
   }
 
-  void _start() {
-    _stopwatch.start();
-    _timer = Timer.periodic(const Duration(milliseconds: 33), (_) {
-      setState(() => _elapsed = _stopwatch.elapsed);
-    });
-    setState(() {});
-  }
-
-  void _pause() {
-    _stopwatch.stop();
-    _timer?.cancel();
-    _timer = null;
-    setState(() => _elapsed = _stopwatch.elapsed);
-  }
-
-  void _reset() {
-    _stopwatch
-      ..stop()
-      ..reset();
-    _timer?.cancel();
-    _timer = null;
-    setState(() {
-      _elapsed = Duration.zero;
-      _laps.clear();
-    });
-  }
-
-  void _lap() {
-    if (!_running) return;
-    setState(() => _laps.insert(0, _stopwatch.elapsed));
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _copyLaps() async {
-    if (_laps.isEmpty) return;
-    final sb = StringBuffer('秒表分段记录（共 ${_laps.length} 段，总 ${_fmt(_elapsed)}）\n');
-    for (var i = 0; i < _laps.length; i++) {
-      final lap = _laps[i];
-      final prev = i + 1 < _laps.length ? _laps[i + 1] : Duration.zero;
+    final laps = _session.laps;
+    if (laps.isEmpty) return;
+    final sb = StringBuffer(
+      '秒表分段记录（共 ${laps.length} 段，总 ${StopwatchSession.fmt(_session.elapsed)}）\n',
+    );
+    for (var i = 0; i < laps.length; i++) {
+      final lap = laps[i];
+      final prev = i + 1 < laps.length ? laps[i + 1] : Duration.zero;
       final delta = lap - prev;
-      sb.writeln('第 ${_laps.length - i} 段  ${_fmt(lap)}  (分段 ${_fmt(delta)})');
+      sb.writeln('第 ${laps.length - i} 段  ${StopwatchSession.fmt(lap)}  (分段 ${StopwatchSession.fmt(delta)})');
     }
     await Clipboard.setData(ClipboardData(text: sb.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('分段记录已复制到剪贴板')));
-  }
-
-  String _fmt(Duration d) {
-    final days = d.inDays;
-    final h = d.inHours % 24;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    final ms = (d.inMilliseconds % 1000) ~/ 10;
-    final hms = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}.$ms';
-    if (days > 0) return '$days 天 $hms';
-    return hms;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('分段记录已复制到剪贴板')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final running = _session.isRunning;
+    final laps = _session.laps;
+
     return ToolPageScaffold(
       tool: _tool,
       actions: [
-        if (_laps.isNotEmpty)
+        if (laps.isNotEmpty)
           IconButton(
             tooltip: '复制分段记录',
             icon: const Icon(Icons.copy_rounded),
@@ -113,7 +84,7 @@ class _StopwatchPageState extends State<StopwatchPage> {
                   const Spacer(),
                   // 主计时
                   Text(
-                    _fmt(_elapsed),
+                    StopwatchSession.fmt(_session.elapsed),
                     style: theme.textTheme.displayLarge?.copyWith(
                       fontWeight: FontWeight.w300,
                       fontFeatures: const [FontFeature.tabularFigures()],
@@ -122,7 +93,7 @@ class _StopwatchPageState extends State<StopwatchPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _running ? '计时中…' : (_laps.isEmpty ? '点击开始' : '已暂停'),
+                    running ? '计时中…' : (laps.isEmpty ? '点击开始' : '已暂停'),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -135,26 +106,29 @@ class _StopwatchPageState extends State<StopwatchPage> {
                       _RoundButton(
                         icon: Icons.refresh_rounded,
                         label: '重置',
-                        onPressed: _laps.isEmpty && _elapsed == Duration.zero ? null : _reset,
+                        onPressed:
+                            laps.isEmpty && _session.elapsed == Duration.zero
+                                ? null
+                                : _session.reset,
                       ),
                       const SizedBox(width: 20),
                       _BigRoundButton(
-                        icon: _running ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        color: _running ? colorScheme.tertiary : colorScheme.primary,
-                        onPressed: _running ? _pause : _start,
+                        icon: running ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: running ? colorScheme.tertiary : colorScheme.primary,
+                        onPressed: running ? _session.pause : _session.start,
                       ),
                       const SizedBox(width: 20),
                       _RoundButton(
                         icon: Icons.flag_rounded,
                         label: '分段',
-                        onPressed: _running ? _lap : null,
+                        onPressed: running ? _session.lap : null,
                       ),
                     ],
                   ),
                   const SizedBox(height: 28),
                   // 分段列表
                   Expanded(
-                    child: _laps.isEmpty
+                    child: laps.isEmpty
                         ? Center(
                             child: Text(
                               '暂无分段记录',
@@ -164,33 +138,33 @@ class _StopwatchPageState extends State<StopwatchPage> {
                             ),
                           )
                         : ListView.separated(
-                            itemCount: _laps.length,
+                            itemCount: laps.length,
                             separatorBuilder: (_, _) => Divider(
                               height: 1,
                               color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                             ),
                             itemBuilder: (context, index) {
-                              final lap = _laps[index];
-                              final prev = index + 1 < _laps.length ? _laps[index + 1] : Duration.zero;
+                              final lap = laps[index];
+                              final prev = index + 1 < laps.length ? laps[index + 1] : Duration.zero;
                               final delta = lap - prev;
                               final best = _isBestLap(index);
                               return ListTile(
                                 dense: true,
                                 leading: Text(
-                                  '分段 ${_laps.length - index}',
+                                  '分段 ${laps.length - index}',
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 title: Text(
-                                  '本段 ${_fmt(delta)}',
+                                  '本段 ${StopwatchSession.fmt(delta)}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: best ? colorScheme.tertiary : colorScheme.outline,
                                     fontWeight: best ? FontWeight.w700 : FontWeight.normal,
                                   ),
                                 ),
                                 trailing: Text(
-                                  _fmt(lap),
+                                  StopwatchSession.fmt(lap),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontFeatures: const [FontFeature.tabularFigures()],
                                     fontWeight: FontWeight.w600,
@@ -210,9 +184,10 @@ class _StopwatchPageState extends State<StopwatchPage> {
   }
 
   bool _isBestLap(int index) {
-    final delta = _laps[index] - (index + 1 < _laps.length ? _laps[index + 1] : Duration.zero);
-    for (var i = 0; i < _laps.length; i++) {
-      final d = _laps[i] - (i + 1 < _laps.length ? _laps[i + 1] : Duration.zero);
+    final laps = _session.laps;
+    final delta = laps[index] - (index + 1 < laps.length ? laps[index + 1] : Duration.zero);
+    for (var i = 0; i < laps.length; i++) {
+      final d = laps[i] - (i + 1 < laps.length ? laps[i + 1] : Duration.zero);
       if (d < delta) return false;
     }
     return true;
