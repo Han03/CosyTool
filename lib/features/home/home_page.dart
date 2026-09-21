@@ -28,8 +28,6 @@ const List<_ToolGroup> _groups = [
     Icons.handyman_rounded,
     {'dice', 'random_number', 'converter', 'flashlight', 'qrcode'},
   ),
-  _ToolGroup('存储与设置', Icons.storage_rounded, {'settings'}),
-  _ToolGroup('关于', Icons.info_rounded, {'about'}),
 ];
 
 /// 首页：工具总览（分组 + 桌面搜索）。
