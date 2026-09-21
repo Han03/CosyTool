@@ -23,6 +23,22 @@ abstract class ToolSession extends ChangeNotifier {
   /// 状态条"停止"动作：停止引擎（不重置数据）。
   void stop() {}
 
+  /// 会话是否支持暂停 / 继续（小窗显示播放/暂停按钮依据）。
+  bool get canPause => false;
+
+  /// 暂停 / 继续切换（小窗共用）。
+  void togglePause() {}
+
+  /// 桌面端小窗化标记：true 时该会话从状态条移入悬浮小窗。
+  bool pinned = false;
+
+  /// 小窗化 / 恢复主区（触发状态条与小窗层刷新）。
+  void setPinned(bool value) {
+    if (pinned == value) return;
+    pinned = value;
+    notifyRunning();
+  }
+
   /// 运行状态变化时通知状态条刷新。
   @protected
   void notifyRunning() => SessionRegistry.instance.notifyListeners();

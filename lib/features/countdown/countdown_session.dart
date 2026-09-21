@@ -20,6 +20,18 @@ class CountdownSession extends ToolSession {
   bool get isRunning => _running;
 
   @override
+  bool get canPause => true;
+
+  @override
+  void togglePause() {
+    if (_running) {
+      pause();
+    } else {
+      start();
+    }
+  }
+
+  @override
   String get statusLabel => '倒计时';
 
   @override

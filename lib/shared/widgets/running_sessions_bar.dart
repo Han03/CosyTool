@@ -4,19 +4,28 @@ import '../../core/session/session_registry.dart';
 import '../../core/session/tool_session.dart';
 import '../../core/theme/app_tokens.dart';
 
-/// 运行状态条：常驻显示所有运行中的工具会话，点击回跳、可停止。
+/// 运行状态条：常驻显示所有运行中的工具会话，点击回跳、可停止、可小窗化。
 class RunningSessionsBar extends StatelessWidget {
-  const RunningSessionsBar({super.key, required this.onOpenTool});
+  const RunningSessionsBar({
+    super.key,
+    required this.onOpenTool,
+    this.showMinimize = false,
+  });
 
   /// 点击胶囊回跳工具（参数为工具 id）。
   final ValueChanged<String> onOpenTool;
+
+  /// 是否显示"小窗化"按钮（仅桌面端）。
+  final bool showMinimize;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: SessionRegistry.instance,
       builder: (context, _) {
-        final running = SessionRegistry.instance.running;
+        final running = SessionRegistry.instance.running
+            .where((s) => !s.pinned)
+            .toList(growable: false);
         if (running.isEmpty) return const SizedBox.shrink();
         return Container(
           width: double.infinity,
@@ -49,7 +58,11 @@ class RunningSessionsBar extends StatelessWidget {
                   child: Row(
                     children: [
                       for (final session in running) ...[
-                        _SessionChip(session: session, onOpenTool: onOpenTool),
+                        _SessionChip(
+                          session: session,
+                          onOpenTool: onOpenTool,
+                          showMinimize: showMinimize,
+                        ),
                         const SizedBox(width: 8),
                       ],
                     ],
@@ -65,10 +78,15 @@ class RunningSessionsBar extends StatelessWidget {
 }
 
 class _SessionChip extends StatelessWidget {
-  const _SessionChip({required this.session, required this.onOpenTool});
+  const _SessionChip({
+    required this.session,
+    required this.onOpenTool,
+    required this.showMinimize,
+  });
 
   final ToolSession session;
   final ValueChanged<String> onOpenTool;
+  final bool showMinimize;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +128,14 @@ class _SessionChip extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
+              if (showMinimize)
+                IconButton(
+                  tooltip: '小窗化',
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
+                  icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                  onPressed: () => session.setPinned(true),
+                ),
               IconButton(
                 tooltip: '停止 ${session.statusLabel}',
                 visualDensity: VisualDensity.compact,

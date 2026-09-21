@@ -75,6 +75,12 @@ class RecorderSession extends ToolSession {
   bool get isRunning => recording;
 
   @override
+  bool get canPause => true;
+
+  @override
+  void togglePause() => pauseResume();
+
+  @override
   String get statusLabel => '录音';
 
   @override

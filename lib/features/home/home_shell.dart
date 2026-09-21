@@ -8,6 +8,7 @@ import '../../core/theme/theme_controller.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/floating_mini_windows.dart';
 import '../../shared/widgets/running_sessions_bar.dart';
 import 'command_palette.dart';
 import 'home_page.dart';
@@ -37,6 +38,9 @@ class _HomeShellState extends State<HomeShell> {
 
   /// 首页搜索框焦点（桌面 Ctrl+F 注入）。
   final FocusNode _searchFocus = FocusNode();
+
+  /// 桌面端悬浮小窗位置记忆（会话停止后条目保留无害）。
+  final Map<String, Offset> _miniOffsets = {};
 
   /// 侧栏条目：首页（null）→ 设置 → 关于。
   List<ToolInfo?> get _sidebarTools => <ToolInfo?>[
@@ -135,16 +139,35 @@ class _HomeShellState extends State<HomeShell> {
           ),
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(
-            child: Column(
+            child: Stack(
               children: [
-                RunningSessionsBar(onOpenTool: (id) => _openToolById(context, id)),
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    child: _buildPane(context),
+                Positioned.fill(
+                  child: Column(
+                    children: [
+                      RunningSessionsBar(
+                        onOpenTool: (id) => _openToolById(context, id),
+                        showMinimize: true,
+                      ),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          child: _buildPane(context),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                // 悬浮小窗层（置顶，可拖动）
+                FloatingMiniWindows(
+                  onOpenTool: (id) => _openToolById(context, id),
+                  offsets: _miniOffsets,
+                  onOffsetChanged: (id, offset) {
+                    if (mounted) {
+                      setState(() => _miniOffsets[id] = offset);
+                    }
+                  },
                 ),
               ],
             ),

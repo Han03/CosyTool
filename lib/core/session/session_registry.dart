@@ -23,4 +23,8 @@ class SessionRegistry extends ChangeNotifier {
   /// 当前所有运行中的会话（状态条数据源）。
   List<ToolSession> get running =>
       _sessions.values.where((s) => s.isRunning).toList(growable: false);
+
+  /// 小窗化的运行中会话（桌面端悬浮小窗数据源）。
+  List<ToolSession> get pinnedRunning =>
+      _sessions.values.where((s) => s.pinned && s.isRunning).toList(growable: false);
 }
