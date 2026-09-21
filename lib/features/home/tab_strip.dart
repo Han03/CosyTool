@@ -297,6 +297,9 @@ class _TabItemState extends State<_TabItem> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
+            // hover 反馈由 AnimatedContainer 背景单独承担，
+            // 禁用 InkWell 自带的 hover 高亮层，避免两层叠加
+            hoverColor: Colors.transparent,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
             onTap: widget.onTap,
             child: Padding(

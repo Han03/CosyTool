@@ -46,7 +46,6 @@ void main() {
     expect(find.text('倒计时'), findsOneWidget);
     final r1 = tester.getRect(find.text('秒表'));
     final r2 = tester.getRect(find.text('倒计时'));
-    final stripRect = tester.getRect(find.byType(TabStrip));
     debugPrint('STRIP= TAB1= TAB2=');
     expect(r1.overlaps(r2), isFalse);
 
@@ -98,7 +97,6 @@ void main() {
     expect(find.text('倒计时'), findsOneWidget);
     final r1 = tester.getRect(find.text('秒表'));
     final r2 = tester.getRect(find.text('倒计时'));
-    final stripRect = tester.getRect(find.byType(TabStrip));
     debugPrint('STRIP= TAB1= TAB2=');
     expect(r1.overlaps(r2), isFalse);
     debugPrint('UPDATE-STRIP OK');
