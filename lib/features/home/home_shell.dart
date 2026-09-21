@@ -11,6 +11,7 @@ import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/floating_mini_windows.dart';
 import '../../shared/widgets/running_sessions_bar.dart';
 import 'command_palette.dart';
+import 'tab_strip.dart';
 import 'home_page.dart';
 
 /// 响应式应用外壳。
@@ -133,6 +134,26 @@ class _HomeShellState extends State<HomeShell> {
             onSelected: (t) => _openTool(context, t),
           );
         },
+        const SingleActivator(LogicalKeyboardKey.keyW, control: true): () {
+          if (_tabs.isNotEmpty && _activeTab >= 0) _closeTab(_activeTab);
+        },
+        const SingleActivator(LogicalKeyboardKey.tab, control: true): () {
+          if (_tabs.isEmpty) return;
+          final cur = _activeTab < 0 ? 0 : _activeTab;
+          setState(() => _activeTab = (cur + 1) % _tabs.length);
+        },
+        const SingleActivator(
+          LogicalKeyboardKey.tab,
+          control: true,
+          shift: true,
+        ): () {
+          if (_tabs.isEmpty) return;
+          final cur = _activeTab < 0 ? 0 : _activeTab;
+          setState(
+            () => _activeTab = (cur - 1 + _tabs.length) % _tabs.length,
+          );
+        },
+
       },
       child: Focus(
         autofocus: true,
@@ -176,7 +197,7 @@ class _HomeShellState extends State<HomeShell> {
                         showMinimize: true,
                       ),
                       if (_tabs.isNotEmpty)
-                        _TabStrip(
+                        TabStrip(
                           tabs: _tabs,
                           activeIndex: _activeTab,
                           onSelect: (i) =>
@@ -415,90 +436,6 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-/// 桌面端工具多开 Tab 条：同时容纳多个工具页，点击切换、可关闭。
-class _TabStrip extends StatelessWidget {
-  const _TabStrip({
-    required this.tabs,
-    required this.activeIndex,
-    required this.onSelect,
-    required this.onClose,
-  });
-
-  final List<ToolInfo> tabs;
-  final int activeIndex;
-  final ValueChanged<int> onSelect;
-  final ValueChanged<int> onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
-      height: 42,
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLowest,
-        border: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: tabs.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemBuilder: (context, index) {
-          final tool = tabs[index];
-          final active = index == activeIndex;
-          return Material(
-            color: active
-                ? colorScheme.primaryContainer.withValues(alpha: 0.6)
-                : colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () => onSelect(index),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 10, right: 2),
-                child: Row(
-                  children: [
-                    Icon(
-                      tool.icon,
-                      size: 16,
-                      color: active
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      tool.name,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                        color: active
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    IconButton(
-                      tooltip: '关闭 ${tool.name}',
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 15,
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => onClose(index),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 /// 桌面端左侧导航栏：仅骨架入口（首页 / 设置 / 关于）。
 class _Sidebar extends StatelessWidget {
