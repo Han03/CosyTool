@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/data/app_data.dart';
+import '../../core/responsive/responsive.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/empty_state.dart';
@@ -49,6 +52,7 @@ class _TextReaderPageState extends State<TextReaderPage> {
   double _pitch = 0;
 
   _ReaderMode _mode = _ReaderMode.input;
+  bool _dragActive = false;
 
   // 小说模式状态
   File? _bookFile;
@@ -262,6 +266,65 @@ class _TextReaderPageState extends State<TextReaderPage> {
     _showMessage('已清理 $count 条语音缓存');
   }
 
+  // ---------------- 桌面拖放 ----------------
+
+  /// 桌面端支持把 .txt 直接拖入页面打开阅读。
+  Widget _withDropTarget(BuildContext context, Widget child) {
+    if (!Responsive.isDesktop(context)) return child;
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _dragActive = true),
+      onDragExited: (_) => setState(() => _dragActive = false),
+      onDragDone: (details) {
+        setState(() => _dragActive = false);
+        final txt = details.files
+            .where((f) => f.path.toLowerCase().endsWith('.txt'))
+            .firstOrNull;
+        if (txt == null) {
+          _showMessage('仅支持拖入 .txt 小说文件');
+          return;
+        }
+        _openBook(File(txt.path));
+      },
+      child: Stack(
+        children: [
+          child,
+          if (_dragActive)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: BrandColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                      color: BrandColors.primary,
+                      width: 2,
+                    ),
+                  ),
+                  margin: const EdgeInsets.all(12),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.upload_file_rounded,
+                          size: 44, color: BrandColors.primary),
+                      const SizedBox(height: 8),
+                      Text(
+                        '松开以打开 .txt 小说',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: BrandColors.primary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   // ---------------- UI ----------------
 
   @override
@@ -288,8 +351,10 @@ class _TextReaderPageState extends State<TextReaderPage> {
     return ToolPageScaffold(
       tool: _tool,
       actions: actions,
-      child: SafeArea(
-        child: Center(
+      child: _withDropTarget(
+        context,
+        SafeArea(
+          child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: _mode == _ReaderMode.book && _bookFile != null
@@ -326,6 +391,7 @@ class _TextReaderPageState extends State<TextReaderPage> {
                   ),
           ),
         ),
+      ),
       ),
     );
   }
