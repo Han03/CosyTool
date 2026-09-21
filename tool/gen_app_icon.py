@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
-"""生成 CosyTool 应用图标：蓝青渐变 + 白色工具箱（复刻菜单上方图标视觉）。
+"""生成 CosyTool 应用图标：青绿渐变背景 + 白色 handyman_rounded 字形。
 
+与菜单上方图标完全一致（同一个 MaterialIcons 字体 glyph 0xf7cc）。
 输出 icons/ 目录：1024 源图、Windows ICO、Android mipmap PNG、iOS AppIcon PNG。
 """
 import os
+import numpy as np
 from PIL import Image, ImageDraw
+import freetype
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
 os.makedirs(OUT, exist_ok=True)
 
+FONT = r"C:\flutter\bin\cache\artifacts\material_fonts\MaterialIcons-Regular.otf"
+GLYPH = 0xF7CC  # Icons.handyman_rounded
+
 C1 = (14, 159, 143)   # #0E9F8F
 C2 = (55, 182, 201)   # #37B6C9
 WHITE = (255, 255, 255, 255)
-CLEAR = (0, 0, 0, 0)
 
 
 def lerp(a, b, t):
@@ -30,39 +35,34 @@ def make_gradient(size, c1, c2):
     return img
 
 
+def render_glyph(size):
+    """渲染 handyman_rounded 字形为 RGBA（内容区透明外扩，白色字形）。"""
+    face = freetype.Face(FONT)
+    face.set_char_size(size * 64)
+    face.load_char(GLYPH)
+    bm = face.glyph.bitmap
+    w, h = bm.width, bm.rows
+    buf = np.frombuffer(bytes(bm.buffer), np.uint8).reshape(h, w)
+    # 内容 bbox
+    ys, xs = np.nonzero(buf > 8)
+    x0, x1 = xs.min(), xs.max()
+    y0, y1 = ys.min(), ys.max()
+    crop = buf[y0:y1 + 1, x0:x1 + 1]
+    alpha = Image.fromarray(crop, "L")
+    rgba = Image.new("RGBA", alpha.size, WHITE)
+    rgba.putalpha(alpha)
+    return rgba
+
+
 def build_icon(size, rounded=False):
     img = make_gradient(size, C1, C2).convert("RGBA")
-    s = size / 1024.0
-    cx = size / 2.0
-    bg = lerp(C1, C2, 0.55) + (255,)
-
-    # 箱体
-    box_w, box_h, r = 520 * s, 330 * s, 78 * s
-    x0, x1 = cx - box_w / 2, cx + box_w / 2
-    y0, y1 = size * 0.46, size * 0.46 + box_h
-    layer = Image.new("RGBA", (size, size), CLEAR)
-    d = ImageDraw.Draw(layer)
-    d.rounded_rectangle([x0, y0, x1, y1], radius=r, fill=WHITE)
-
-    # 提手：白色圆环上半（拱形），下半自然被箱体同色覆盖
-    hr_out, hr_in = 178 * s, 106 * s
-    hcy = y0 - 30 * s
-    d.ellipse([cx - hr_out, hcy - hr_out, cx + hr_out, hcy + hr_out], fill=WHITE)
-    d.ellipse([cx - hr_in, hcy - hr_in, cx + hr_in, hcy + hr_in], fill=CLEAR)
-    # 环下缘以下（箱体顶之上部分）保持透明，避免影响箱体轮廓
-    d.rectangle([cx - hr_out, y0, cx + hr_out, hcy + hr_out], fill=CLEAR)
-
-    # 锁扣带 + 两端锁扣（背景渐变色）
-    band_h = 44 * s
-    by0 = y0 + (box_h - band_h) / 2
-    by1 = by0 + band_h
-    d.rectangle([x0, by0, x1, by1], fill=bg)
-    lock_w = 78 * s
-    for lx in (x0 + 96 * s, x1 - 96 * s - lock_w):
-        d.rectangle([lx, by0, lx + lock_w, by1], fill=bg)
-
-    img.alpha_composite(layer)
-
+    # 字形缩放到图标尺寸的 ~62%（应用图标元素占比），居中
+    glyph = render_glyph(max(256, size))
+    target = int(size * 0.62)
+    glyph = glyph.resize((target, target), Image.LANCZOS)
+    ox = (size - target) // 2
+    oy = (size - target) // 2
+    img.alpha_composite(glyph, (ox, oy))
     if rounded:
         mask = Image.new("L", (size, size), 0)
         ImageDraw.Draw(mask).rounded_rectangle(
