@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
@@ -280,7 +281,7 @@ class _PomodoroPageState extends State<PomodoroPage> {
                                 ? Icons.radio_button_checked_rounded
                                 : Icons.radio_button_unchecked_rounded,
                             color: i < _round % _roundsPerLongBreak
-                                ? const Color(0xFFE85D5D)
+                                ? BrandColors.primary
                                 : colorScheme.outlineVariant,
                             size: 22,
                           ),

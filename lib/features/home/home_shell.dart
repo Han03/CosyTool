@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_controller.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import 'home_page.dart';
@@ -15,7 +16,9 @@ import 'home_page.dart';
 /// 工具数量较多（12+），桌面侧采用可滚动的自定义侧边栏，
 /// 避免 NavigationRail 在矮屏上溢出。
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, required this.themeController});
+
+  final ThemeController themeController;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -158,17 +161,7 @@ class _HomeShellState extends State<HomeShell> {
           ),
           for (var i = 0; i < _navTools.length; i++) _drawerTile(context, i),
           const Divider(),
-          ListTile(
-            leading: const Icon(Icons.settings_brightness_rounded),
-            title: const Text('深色模式'),
-            trailing: const Icon(Icons.auto_mode_rounded),
-            subtitle: const Text('跟随系统'),
-            onTap: () {
-              Scaffold.of(context).closeDrawer();
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('主题自动跟随系统设置')));
-            },
-          ),
+          _buildAppearanceSection(context),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
@@ -178,6 +171,68 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 外观设置：跟随系统 / 浅色 / 深色，实时生效并持久化。
+  Widget _buildAppearanceSection(BuildContext context) {
+    final theme = Theme.of(context);
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: widget.themeController,
+      builder: (context, mode, _) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.settings_brightness_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '外观',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      label: Text('跟随系统'),
+                      icon: Icon(Icons.brightness_auto_rounded, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.light,
+                      label: Text('浅色'),
+                      icon: Icon(Icons.light_mode_rounded, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.dark,
+                      label: Text('深色'),
+                      icon: Icon(Icons.dark_mode_rounded, size: 16),
+                    ),
+                  ],
+                  selected: {mode},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (s) {
+                    widget.themeController.setMode(s.first);
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -281,34 +336,54 @@ class _Sidebar extends StatelessWidget {
                       horizontal: 8,
                       vertical: 2,
                     ),
-                    child: ListTile(
-                      dense: true,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      selected: selected,
-                      selectedTileColor: colorScheme.primaryContainer
-                          .withValues(alpha: 0.55),
-                      leading: Icon(
-                        tool?.icon ?? Icons.home_rounded,
-                        size: 20,
-                        color: selected
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                      title: Text(
-                        tool?.name ?? '首页',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: selected
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurface,
+                    child: Row(
+                      children: [
+                        // 选中指示条（品牌绿）
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          width: 3,
+                          height: 22,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppThemeSeed.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      ),
-                      onTap: () => onSelected(index),
+                        Expanded(
+                          child: ListTile(
+                            dense: true,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            selected: selected,
+                            selectedTileColor: colorScheme.primaryContainer
+                                .withValues(alpha: 0.55),
+                            leading: Icon(
+                              tool?.icon ?? Icons.home_rounded,
+                              size: 20,
+                              color: selected
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                            title: Text(
+                              tool?.name ?? '首页',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onSurface,
+                              ),
+                            ),
+                            onTap: () => onSelected(index),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },

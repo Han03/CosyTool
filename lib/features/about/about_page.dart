@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/responsive/responsive.dart';
+import '../../core/theme/app_tokens.dart';
 import '../../core/utils/platform_check.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
@@ -41,7 +42,7 @@ class AboutPage extends StatelessWidget {
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF0E9F8F), Color(0xFF37B6C9)],
+                            colors: [BrandColors.primary, BrandColors.secondary],
                           ),
                         ),
                         child: const Icon(Icons.handyman_rounded, color: Colors.white, size: 34),
