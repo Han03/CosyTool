@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/responsive/responsive.dart';
-import '../../core/theme/app_tokens.dart';
 import '../../core/utils/platform_check.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
+import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
 
 /// 关于页面：项目介绍、技术栈与平台支持。
@@ -34,19 +34,7 @@ class AboutPage extends StatelessWidget {
                   // Logo + 名称
                   Row(
                     children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [BrandColors.primary, BrandColors.secondary],
-                          ),
-                        ),
-                        child: const Icon(Icons.handyman_rounded, color: Colors.white, size: 34),
-                      ),
+                      const AppLogo(size: 64, iconSize: 34),
                       const SizedBox(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

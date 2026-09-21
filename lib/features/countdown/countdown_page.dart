@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
+import '../../shared/widgets/app_dialog.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
 
 /// 倒计时工具：预设 + 自定义时长，圆环进度展示，结束时震动 + 提示音。
@@ -140,23 +141,18 @@ class _CountdownPageState extends State<CountdownPage> {
   }
 
   void _showFinishedDialog() {
-    showDialog<void>(
+    showAppDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.notifications_active_rounded,
-          size: 40,
-          color: Theme.of(ctx).extension<AppSemanticColors>()!.danger,
+      icon: Icons.notifications_active_rounded,
+      iconColor: Theme.of(context).extension<AppSemanticColors>()!.danger,
+      title: '时间到！',
+      content: const Text('倒计时已结束。'),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('好的'),
         ),
-        title: const Text('时间到！'),
-        content: const Text('倒计时已结束。'),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('好的'),
-          ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -216,11 +212,28 @@ class _CountdownPageState extends State<CountdownPage> {
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              _fmt(_remaining),
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                fontWeight: FontWeight.w300,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                            // 大数字平滑翻转（每秒变化一次，150ms 淡入+微滑）
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 150),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, anim) => FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.18),
+                                    end: Offset.zero,
+                                  ).animate(anim),
+                                  child: child,
+                                ),
+                              ),
+                              child: Text(
+                                _fmt(_remaining),
+                                key: ValueKey(_fmt(_remaining)),
+                                style: theme.textTheme.displayMedium?.copyWith(
+                                  fontWeight: FontWeight.w300,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),

@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
+import '../../shared/widgets/app_logo.dart';
 import 'home_page.dart';
 
 /// 响应式应用外壳。
@@ -280,23 +281,7 @@ class _Sidebar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppThemeSeed.primary, AppThemeSeed.secondary],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.handyman_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
+                  const AppLogo(size: 40, iconSize: 22),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

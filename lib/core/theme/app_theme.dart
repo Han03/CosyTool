@@ -36,7 +36,8 @@ class AppTheme {
 
   static ThemeData _build(ColorScheme scheme) {
     final isDark = scheme.brightness == Brightness.dark;
-    return ThemeData(
+    // 说明文字 12 -> 13px，提升可读性（对比度 ≥ 4.5:1）
+    final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: isDark ? const Color(0xFF111418) : const Color(0xFFF6F7F9),
@@ -113,6 +114,12 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       tooltipTheme: const TooltipThemeData(waitDuration: Duration(milliseconds: 600)),
+    );
+    return base.copyWith(
+      textTheme: base.textTheme.copyWith(
+        bodySmall: base.textTheme.bodySmall?.copyWith(fontSize: 13),
+        labelSmall: base.textTheme.labelSmall?.copyWith(fontSize: 11.5),
+      ),
     );
   }
 }

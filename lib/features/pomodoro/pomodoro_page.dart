@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
+import '../../shared/widgets/app_dialog.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
 
 /// 番茄钟工具：工作 / 短休 / 长休循环。
@@ -185,37 +186,36 @@ class _PomodoroPageState extends State<PomodoroPage> {
     final wCtrl = TextEditingController(text: '$_workMin');
     final sCtrl = TextEditingController(text: '$_shortBreakMin');
     final lCtrl = TextEditingController(text: '$_longBreakMin');
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('番茄钟设置'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: wCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '专注时长（分钟）', prefixIcon: Icon(Icons.work_rounded)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: sCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '短休息（分钟）', prefixIcon: Icon(Icons.self_improvement_rounded)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: lCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '长休息（分钟）', prefixIcon: Icon(Icons.beach_access_rounded)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('保存')),
+      icon: Icons.timer_rounded,
+      title: '番茄钟设置',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: wCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '专注时长（分钟）', prefixIcon: Icon(Icons.work_rounded)),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: sCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '短休息（分钟）', prefixIcon: Icon(Icons.self_improvement_rounded)),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: lCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '长休息（分钟）', prefixIcon: Icon(Icons.beach_access_rounded)),
+          ),
         ],
       ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('保存')),
+      ],
     );
     if (ok != true || !mounted) return;
     final w = int.tryParse(wCtrl.text.trim());
@@ -314,11 +314,28 @@ class _PomodoroPageState extends State<PomodoroPage> {
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              _fmt(_remaining),
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                fontWeight: FontWeight.w300,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                            // 大数字平滑翻转
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 150),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, anim) => FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.18),
+                                    end: Offset.zero,
+                                  ).animate(anim),
+                                  child: child,
+                                ),
+                              ),
+                              child: Text(
+                                _fmt(_remaining),
+                                key: ValueKey(_fmt(_remaining)),
+                                style: theme.textTheme.displayMedium?.copyWith(
+                                  fontWeight: FontWeight.w300,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),
