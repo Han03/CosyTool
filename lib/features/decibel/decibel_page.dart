@@ -1,19 +1,13 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/session/session_registry.dart';
 import '../../core/theme/app_tokens.dart';
-import '../../core/utils/permissions.dart';
 import '../../data/tools_registry.dart';
 import '../../models/tool_info.dart';
 import '../../shared/widgets/tool_page_scaffold.dart';
+import 'decibel_session.dart';
 
-/// 分贝测试工具：实时测量环境音量并绘制趋势曲线。
+/// 分贝测试工具：实时测量环境音量并绘制趋势曲线（引擎常驻，切页不断）。
 ///
 /// 通过 `record` 的振幅流（dBFS）读取音量，并映射为参考分贝值。
 /// 注意：手机麦克风未做设备校准，数值为相对参考，不同设备存在差异；
@@ -28,160 +22,44 @@ class DecibelPage extends StatefulWidget {
 class _DecibelPageState extends State<DecibelPage> {
   static final ToolInfo _tool = ToolRegistry.of('decibel');
 
-  static const int _historySize = 180;
-
-  final AudioRecorder _recorder = AudioRecorder();
-  StreamSubscription<Amplitude>? _sub;
-  String? _tempPath;
-  Timer? _ticker;
-
-  bool _running = false;
-  String? _error;
-
-  double _calibration = 0; // 校准偏移（dB），持久化
-  DateTime? _sessionStart;
-  Duration _sessionElapsed = Duration.zero;
-
-  double _current = 0;
-  double _min = 0;
-  double _max = 0;
-  double _sum = 0;
-  int _count = 0;
-  final List<double> _history = [];
+  late final DecibelSession _session;
 
   @override
   void initState() {
     super.initState();
-    _loadCalibration();
-  }
-
-  Future<void> _loadCalibration() async {
-    final prefs = await SharedPreferences.getInstance();
-    final v = prefs.getDouble('decibel_calibration') ?? 0;
-    if (mounted) setState(() => _calibration = v);
-  }
-
-  Future<void> _saveCalibration(double v) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('decibel_calibration', v);
+    _session = SessionRegistry.instance.sessionOf('decibel', DecibelSession.new);
+    _session.addListener(_onChanged);
+    _session.loadCalibration();
   }
 
   @override
   void dispose() {
-    _stop();
-    _ticker?.cancel();
-    _recorder.dispose();
+    _session.removeListener(_onChanged);
     super.dispose();
   }
 
-  Future<void> _toggle() async {
-    if (_running) {
-      await _stop();
-      if (mounted) setState(() {});
-      return;
-    }
-    final granted = await Permissions.requestMic();
-    if (!granted) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('未获得麦克风权限，无法测量')),
-      );
-      return;
-    }
-    try {
-      // 先起一个极小的临时录制，为振幅流提供会话
-      final tmp = await getTemporaryDirectory();
-      _tempPath =
-          '${tmp.path}${Platform.pathSeparator}cosytool_decibel_${DateTime.now().millisecondsSinceEpoch}.wav';
-      await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          sampleRate: 16000,
-          numChannels: 1,
-          autoGain: true,
-        ),
-        path: _tempPath!,
-      );
-      _sub = _recorder
-          .onAmplitudeChanged(const Duration(milliseconds: 120))
-          .listen(_onAmplitude);
-      _sessionStart = DateTime.now();
-      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) {
-          setState(() {
-            _sessionElapsed = DateTime.now().difference(_sessionStart!);
-          });
-        }
-      });
-      if (!mounted) return;
-      setState(() {
-        _running = true;
-        _error = null;
-        _min = 0;
-        _max = 0;
-        _sum = 0;
-        _count = 0;
-        _current = 0;
-        _sessionElapsed = Duration.zero;
-        _history.clear();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = '无法启动测量：$e');
-    }
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
-  void _onAmplitude(Amplitude amp) {
-    final db = _toReferenceDb(amp.current);
+  Future<void> _exportCsv() async {
+    final path = await _session.exportCsv();
     if (!mounted) return;
-    setState(() {
-      _current = db;
-      if (_count == 0) {
-        _min = db;
-        _max = db;
-      } else {
-        if (db < _min) _min = db;
-        if (db > _max) _max = db;
-      }
-      _sum += db;
-      _count++;
-      _history.add(db);
-      if (_history.length > _historySize) _history.removeAt(0);
-    });
-  }
-
-  Future<void> _stop() async {
-    _ticker?.cancel();
-    _ticker = null;
-    await _sub?.cancel();
-    _sub = null;
-    try {
-      await _recorder.stop();
-    } catch (_) {}
-    final path = _tempPath;
-    _tempPath = null;
     if (path != null) {
-      final f = File(path);
-      if (await f.exists()) {
-        try {
-          await f.delete();
-        } catch (_) {}
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('CSV 已保存到：$path\n概要已复制到剪贴板')),
+      );
+    } else if (_session.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_session.error!)),
+      );
     }
-    _running = false;
   }
-
-  double _toReferenceDb(double dbfs) {
-    if (!dbfs.isFinite) dbfs = -60;
-    return (dbfs + 100 + _calibration).clamp(20.0, 120.0);
-  }
-
-  double get _avg => _count == 0 ? 0 : _sum / _count;
 
   (String, Color) _levelInfo(BuildContext context) {
     final theme = Theme.of(context);
     final s = theme.extension<AppSemanticColors>()!;
-    final d = _current;
+    final d = _session.current;
     if (d < 40) return ('非常安静', theme.colorScheme.outline);
     if (d < 50) return ('安静', s.success);
     if (d < 60) return ('正常交谈', s.success);
@@ -191,50 +69,17 @@ class _DecibelPageState extends State<DecibelPage> {
     return ('震耳欲聋', s.danger);
   }
 
-  String _fmtDur(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final s = d.inSeconds % 60;
-    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _exportCsv() async {
-    if (_history.isEmpty) return;
-    final sb = StringBuffer('时间,分贝(dB)\n');
-    for (var i = 0; i < _history.length; i++) {
-      sb.writeln('${(i * 0.12).toStringAsFixed(2)},${_history[i].toStringAsFixed(1)}');
-    }
-    try {
-      final docs = await getApplicationDocumentsDirectory();
-      final file = File(
-        '${docs.path}${Platform.pathSeparator}decibel_${DateTime.now().millisecondsSinceEpoch}.csv',
-      );
-      await file.writeAsString(sb.toString());
-      // 同时复制概要到剪贴板
-      final summary = '分贝测量概要\n时长: ${_fmtDur(_sessionElapsed)}\n'
-          '最低: ${_min.round()} dB\n平均: ${_avg.round()} dB\n峰值: ${_max.round()} dB\n';
-      await Clipboard.setData(ClipboardData(text: summary));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('CSV 已保存到：${file.path}\n概要已复制到剪贴板')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('导出失败：$e')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final session = _session;
     final (levelText, levelColor) = _levelInfo(context);
 
     return ToolPageScaffold(
       tool: _tool,
       actions: [
-        if (_history.isNotEmpty)
+        if (session.history.isNotEmpty)
           IconButton(
             tooltip: '导出 CSV',
             icon: const Icon(Icons.download_rounded),
@@ -256,11 +101,11 @@ class _DecibelPageState extends State<DecibelPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _running ? _current.round().toString() : '--',
+                        session.running ? session.current.round().toString() : '--',
                         style: theme.textTheme.displayLarge?.copyWith(
                           fontWeight: FontWeight.w200,
                           fontFeatures: const [FontFeature.tabularFigures()],
-                          color: _running ? levelColor : colorScheme.outline,
+                          color: session.running ? levelColor : colorScheme.outline,
                         ),
                       ),
                       Padding(
@@ -270,16 +115,16 @@ class _DecibelPageState extends State<DecibelPage> {
                     ],
                   ),
                   Text(
-                    _running ? levelText : '点击开始测量',
+                    session.running ? levelText : '点击开始测量',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: _running ? levelColor : colorScheme.outline,
+                      color: session.running ? levelColor : colorScheme.outline,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (_running)
+                  if (session.running)
                     Text(
-                      '已测量 ${_fmtDur(_sessionElapsed)} · 采样 $_count 次',
+                      '已测量 ${DecibelSession.fmtDuration(session.sessionElapsed)} · 采样 ${session.count} 次',
                       style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   const SizedBox(height: 24),
@@ -289,7 +134,7 @@ class _DecibelPageState extends State<DecibelPage> {
                     child: CustomPaint(
                       size: const Size(double.infinity, 150),
                       painter: _BarPainter(
-                        value: _running ? (_current - 20) / 100 : 0,
+                        value: session.running ? (session.current - 20) / 100 : 0,
                         color: levelColor,
                       ),
                     ),
@@ -307,7 +152,7 @@ class _DecibelPageState extends State<DecibelPage> {
                     child: CustomPaint(
                       size: const Size(double.infinity, 120),
                       painter: _HistoryPainter(
-                        values: _history,
+                        values: session.history,
                         min: 20,
                         max: 120,
                         lineColor: colorScheme.primary,
@@ -319,11 +164,11 @@ class _DecibelPageState extends State<DecibelPage> {
                   // 统计
                   Row(
                     children: [
-                      _StatCard(label: '最低', value: _count == 0 ? '--' : '${_min.round()} dB', color: colorScheme.tertiary),
+                      _StatCard(label: '最低', value: session.count == 0 ? '--' : '${session.min.round()} dB', color: colorScheme.tertiary),
                       const SizedBox(width: 12),
-                      _StatCard(label: '平均', value: _count == 0 ? '--' : '${_avg.round()} dB', color: colorScheme.primary),
+                      _StatCard(label: '平均', value: session.count == 0 ? '--' : '${session.avg.round()} dB', color: colorScheme.primary),
                       const SizedBox(width: 12),
-                      _StatCard(label: '峰值', value: _count == 0 ? '--' : '${_max.round()} dB', color: colorScheme.error),
+                      _StatCard(label: '峰值', value: session.count == 0 ? '--' : '${session.max.round()} dB', color: colorScheme.error),
                     ],
                   ),
                   const Spacer(),
@@ -336,21 +181,19 @@ class _DecibelPageState extends State<DecibelPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Slider(
-                          value: _calibration,
+                          value: session.calibration,
                           min: -20,
                           max: 20,
                           divisions: 40,
-                          label: '${_calibration.round()} dB',
-                          onChanged: (v) {
-                            setState(() => _calibration = v.roundToDouble());
-                          },
-                          onChangeEnd: (v) => _saveCalibration(v.roundToDouble()),
+                          label: '${session.calibration.round()} dB',
+                          onChanged: (v) => setState(() => session.calibration = v.roundToDouble()),
+                          onChangeEnd: (v) => session.saveCalibration(v.roundToDouble()),
                         ),
                       ),
                       SizedBox(
                         width: 48,
                         child: Text(
-                          '${_calibration > 0 ? '+' : ''}${_calibration.round()} dB',
+                          '${session.calibration > 0 ? '+' : ''}${session.calibration.round()} dB',
                           textAlign: TextAlign.right,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
@@ -362,12 +205,12 @@ class _DecibelPageState extends State<DecibelPage> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton.icon(
-                    onPressed: _toggle,
-                    icon: Icon(_running ? Icons.stop_rounded : Icons.play_arrow_rounded),
-                    label: Text(_running ? '停止测量' : '开始测量'),
+                    onPressed: session.toggle,
+                    icon: Icon(session.running ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                    label: Text(session.running ? '停止测量' : '开始测量'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(220, 48),
-                      backgroundColor: _running ? colorScheme.error : null,
+                      backgroundColor: session.running ? colorScheme.error : null,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -376,11 +219,11 @@ class _DecibelPageState extends State<DecibelPage> {
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.outline),
                   ),
-                  if (_error != null)
+                  if (session.error != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        _error!,
+                        session.error!,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: colorScheme.error, fontSize: 13),
                       ),
