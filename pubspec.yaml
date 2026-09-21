@@ -32,6 +32,8 @@ dependencies:
   gal: ^2.3.3
   # 耳返：miniaudio 原生双工回环（<15ms） + AEC 防啸叫
   flutter_recorder: ^2.0.3
+  # 文本阅读：Edge-TTS HTTP 服务
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

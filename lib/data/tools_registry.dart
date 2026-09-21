@@ -13,6 +13,7 @@ import '../features/qrcode/qrcode_page.dart';
 import '../features/random_tool/random_number_page.dart';
 import '../features/recorder/recorder_page.dart';
 import '../features/stopwatch/stopwatch_page.dart';
+import '../features/text_reader/text_reader_page.dart';
 import '../features/text_tools/text_tools_page.dart';
 import '../features/word_count/word_count_page.dart';
 import '../models/tool_info.dart';
@@ -152,6 +153,15 @@ class ToolRegistry {
       accent: const Color(0xFF607D8B),
       builder: (_) => const WordCountPage(),
       tags: const ['text', 'count', 'word'],
+    ),
+    ToolInfo(
+      id: 'text_reader',
+      name: '文本阅读',
+      description: 'Edge-TTS 语音朗读文本',
+      icon: Icons.record_voice_over_rounded,
+      accent: const Color(0xFF5B8DEF),
+      builder: (_) => const TextReaderPage(),
+      tags: const ['text', 'audio', 'tts'],
     ),
   ];
 
